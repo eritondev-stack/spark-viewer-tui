@@ -1,0 +1,29 @@
+
+agora que integrar essa ui com pyspark, a ideia e iniciar uma sessao do spark, sendo antes de comecar a sessao, preciso setar o caminho do metastore_db e o warehouse_dir, eu aperto alguma atalho e abre um popup para colocar esses caminhos, e ao colocar esse caminho ele fica salvo para quando iniciar uma sessao de novo eles estarem configurados.
+
+
+packages = [
+            "io.delta:delta-spark_2.12:3.1.0",
+        ]
+        metastore_db = ""
+        warehouse_dir = ""
+        return (SparkSession.getActiveSession() or
+                SparkSession.builder
+                .appName("LocalDeltaPipeline")
+                .master("local[*]")
+                .config("spark.jars.packages", ",".join(packages))
+                .config("spark.sql.extensions",
+                        "io.delta.sql.DeltaSparkSessionExtension")
+                .config("spark.sql.catalog.spark_catalog",
+                        "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+                .config("spark.sql.warehouse.dir", warehouse_dir)
+                .config("spark.sql.catalogImplementation", "hive")
+                .config('spark.hadoop.javax.jdo.option.ConnectionURL',f"jdbc:derby:;databaseName={metastore_db};create=true")     
+                .enableHiveSupport()
+                .getOrCreate())
+
+quando comecar iniciar a sessao, mostrar algo visual informando que spark comecou a iniciar a sessao 
+
+apois iniciar a sessao, no sidebar, carrega as bancos e as tabelas.
+
+

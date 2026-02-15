@@ -1,0 +1,10 @@
+[project]
+name = "textual-app"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "textual>=7.5.0",
+    "pyspark>=3.5.0",
+]

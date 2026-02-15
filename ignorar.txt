@@ -22,8 +22,14 @@ packages = [
                 .enableHiveSupport()
                 .getOrCreate())
 
-quando comecar iniciar a sessao, mostrar algo visual informando que spark comecou a iniciar a sessao 
+quando comecar iniciar a sessao, mostrar algo visual informando que spark comecou a iniciar a sessao e quando terminar um feedback informando que spark foi inciado.
+
 
 apois iniciar a sessao, no sidebar, carrega as bancos e as tabelas.
+
+ao clicar no tabela ao lado, faz automaticamente um spark.sql("select * from tabela x"), e o textarea ficara para fazer querys, mas nao vou usar spark.sql, quero somente passar a query sql, e quando a query comecar a carregar, mostrar um loading na area da tabela informando que esta carregando, e a tabela precisa esta na mesma estrtura, tipo e nome da columa.
+
+
+aproveita e monsta um script um spark, para criar umas 6 tabelas, com 500 linhas cada, apra testar o catalog.
 
 

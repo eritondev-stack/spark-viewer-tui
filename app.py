@@ -1,45 +1,33 @@
-import random
-from datetime import datetime, timedelta
-
 from rich.text import Text
+from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical
-from textual.widgets import TextArea, DataTable, Static, Tree
+from textual.widgets import TextArea, DataTable, Static, Tree, Footer
+
+from config import load_config, save_config
+from spark_manager import SparkManager
+from screens.spark_config import SparkConfigScreen
 
 
 class Sidebar(Static):
-    """Barra lateral da aplicação"""
+    """Barra lateral da aplicacao"""
 
     def compose(self) -> ComposeResult:
-        yield Static("🎨 Minha App Textual", id="title")
+        yield Static("Spark TUI", id="title")
         yield Static("────────────────────", id="separator")
         tree: Tree[str] = Tree("Databases", id="db-tree")
         tree.root.expand()
-
-        # Banco 1
-        pg = tree.root.add("PostgreSQL", expand=True)
-        pg.add_leaf("users")
-        pg.add_leaf("orders")
-        pg.add_leaf("products")
-        pg.add_leaf("payments")
-
-        # Banco 2
-        mysql = tree.root.add("MySQL", expand=True)
-        mysql.add_leaf("customers")
-        mysql.add_leaf("invoices")
-        mysql.add_leaf("inventory")
-
-        # Banco 3
-        mongo = tree.root.add("MongoDB", expand=True)
-        mongo.add_leaf("sessions")
-        mongo.add_leaf("logs")
-        mongo.add_leaf("analytics")
-
         yield tree
 
 
 class TextualApp(App):
-    """Aplicação principal Textual"""
+    """Aplicacao principal Textual"""
+
+    BINDINGS = [
+        ("ctrl+p", "open_config", "Spark Config"),
+        ("ctrl+s", "start_spark", "Start Spark"),
+        ("ctrl+e", "execute_query", "Run SQL"),
+    ]
 
     CSS = """
     Screen {
@@ -153,138 +141,153 @@ class TextualApp(App):
     Static {
         background: transparent;
     }
+
+    Footer {
+        background: transparent;
+    }
     """
+
+    def __init__(self):
+        super().__init__(ansi_color=True)
+        self._config = load_config()
+        self._spark = SparkManager()
 
     def compose(self) -> ComposeResult:
         yield Sidebar()
         with Container(id="main-container"):
             with Vertical():
-                yield TextArea(placeholder="Digite algo aqui...", id="input_text")
+                yield TextArea(placeholder="Digite sua query SQL aqui...", id="input_text")
                 yield DataTable(id="data_table", cursor_type="cell", header_height=3)
+        yield Footer()
+
+    def on_mount(self) -> None:
+        table = self.query_one("#data_table", DataTable)
+        table.add_column(self._make_header("", "No data loaded"), width=30)
+        if self._config.get("metastore_db") and self._config.get("warehouse_dir"):
+            self.notify("Config loaded. Ctrl+S to start Spark.")
+        else:
+            self.notify("Ctrl+P to configure Spark paths.")
 
     def _make_header(self, col_type: str, col_name: str) -> Text:
-        """Cria header com nome em cima, tipo embaixo e linha separadora."""
         t = Text()
         t.append(col_name, style="bold")
-        t.append("\n")
-        t.append(col_type, style="dim italic")
+        if col_type:
+            t.append("\n")
+            t.append(col_type, style="dim italic")
         t.append("\n")
         t.append("─" * 16, style="dim")
         return t
 
-    def on_mount(self) -> None:
-        """Configurar a tabela quando a app montar"""
-        random.seed(42)
+    # ── Config popup ─────────────────────────────────────────
+
+    def action_open_config(self) -> None:
+        self.push_screen(SparkConfigScreen(self._config), self._on_config_saved)
+
+    def _on_config_saved(self, result: dict | None) -> None:
+        if result is not None:
+            self._config = result
+            save_config(result)
+            self.notify("Configuration saved.")
+        else:
+            self.notify("Configuration cancelled.")
+
+    # ── Spark session ────────────────────────────────────────
+
+    def action_start_spark(self) -> None:
+        if self._spark.is_active:
+            self.notify("Spark session already active.", severity="warning")
+            return
+        metastore = self._config.get("metastore_db", "")
+        warehouse = self._config.get("warehouse_dir", "")
+        if not metastore or not warehouse:
+            self.notify("Configure Spark paths first (Ctrl+P).", severity="error")
+            return
+        self.notify("Starting Spark session...")
+        self._start_spark_worker(metastore, warehouse)
+
+    @work(thread=True, exclusive=True)
+    def _start_spark_worker(self, metastore: str, warehouse: str) -> None:
+        try:
+            self._spark.start_session(metastore, warehouse)
+            databases = self._spark.list_databases()
+            catalog_data = {}
+            for db in databases:
+                tables = self._spark.list_tables(db)
+                catalog_data[db] = tables
+            self.app.call_from_thread(self._on_spark_ready, catalog_data)
+        except Exception as e:
+            self.app.call_from_thread(self.notify, f"Spark error: {e}", severity="error")
+
+    def _on_spark_ready(self, catalog_data: dict[str, list[str]]) -> None:
+        self.notify("Spark session started!")
+        self._populate_tree(catalog_data)
+
+    def _populate_tree(self, catalog_data: dict[str, list[str]]) -> None:
+        tree = self.query_one("#db-tree", Tree)
+        tree.clear()
+        for db_name, tables in catalog_data.items():
+            db_node = tree.root.add(db_name, expand=True)
+            for table_name in tables:
+                db_node.add_leaf(table_name)
+
+    # ── Tree click -> auto query ─────────────────────────────
+
+    def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
+        node = event.node
+        if node.is_root or node.children:
+            return
+        if not self._spark.is_active:
+            self.notify("Start Spark session first (Ctrl+S).", severity="error")
+            return
+        table_name = str(node.label)
+        db_name = str(node.parent.label)
+        query = f"SELECT * FROM {db_name}.{table_name} LIMIT 1000"
+        text_area = self.query_one("#input_text", TextArea)
+        text_area.load_text(query)
+        self._run_query(query)
+
+    # ── SQL execution ────────────────────────────────────────
+
+    def action_execute_query(self) -> None:
+        if not self._spark.is_active:
+            self.notify("Start Spark session first (Ctrl+S).", severity="error")
+            return
+        text_area = self.query_one("#input_text", TextArea)
+        query = text_area.text.strip()
+        if not query:
+            self.notify("Enter a SQL query first.", severity="warning")
+            return
+        self._run_query(query)
+
+    def _run_query(self, query: str) -> None:
         table = self.query_one("#data_table", DataTable)
+        table.loading = True
+        self._execute_query_worker(query)
 
-        columns = [
-            ("INT", "id"),
-            ("VARCHAR", "first_name"),
-            ("VARCHAR", "last_name"),
-            ("VARCHAR", "email"),
-            ("VARCHAR", "phone"),
-            ("DATE", "birth_date"),
-            ("INT", "age"),
-            ("VARCHAR", "gender"),
-            ("VARCHAR", "address"),
-            ("VARCHAR", "city"),
-            ("VARCHAR", "state"),
-            ("VARCHAR", "country"),
-            ("VARCHAR", "zip_code"),
-            ("VARCHAR", "company"),
-            ("VARCHAR", "department"),
-            ("VARCHAR", "job_title"),
-            ("DECIMAL", "salary"),
-            ("DATE", "hire_date"),
-            ("BOOLEAN", "is_active"),
-            ("VARCHAR", "username"),
-            ("VARCHAR", "status"),
-            ("INT", "login_count"),
-            ("TIMESTAMP", "last_login"),
-            ("FLOAT", "rating"),
-            ("INT", "orders_count"),
-            ("DECIMAL", "total_spent"),
-            ("VARCHAR", "plan"),
-            ("BOOLEAN", "email_verified"),
-            ("VARCHAR", "timezone"),
-            ("VARCHAR", "language"),
-            ("TEXT", "notes"),
-            ("INT", "referral_count"),
-            ("DECIMAL", "credit_balance"),
-            ("TIMESTAMP", "created_at"),
-            ("TIMESTAMP", "updated_at"),
-        ]
+    @work(thread=True, exclusive=True)
+    def _execute_query_worker(self, query: str) -> None:
+        try:
+            schema, rows = self._spark.execute_sql(query)
+            self.app.call_from_thread(self._on_query_results, schema, rows)
+        except Exception as e:
+            self.app.call_from_thread(self._on_query_error, str(e))
 
-        for col_type, col_name in columns:
+    def _on_query_results(self, schema: list[tuple[str, str]], rows: list[list[str]]) -> None:
+        table = self.query_one("#data_table", DataTable)
+        table.clear(columns=True)
+        for col_name, col_type in schema:
             table.add_column(self._make_header(col_type, col_name), width=16)
+        for row in rows:
+            table.add_row(*row)
+        table.loading = False
+        self.notify(f"Query returned {len(rows)} rows.")
 
-        first_names = ["João", "Maria", "Pedro", "Ana", "Carlos", "Lucia", "Rafael", "Fernanda", "Bruno", "Julia", "Lucas", "Camila", "Diego", "Beatriz", "Thiago", "Larissa", "Gustavo", "Amanda", "Mateus", "Isabela"]
-        last_names = ["Silva", "Santos", "Costa", "Lima", "Oliveira", "Souza", "Pereira", "Almeida", "Ferreira", "Rodrigues", "Barros", "Ribeiro", "Martins", "Carvalho", "Gomes"]
-        cities = ["São Paulo", "Rio de Janeiro", "Belo Horizonte", "Curitiba", "Porto Alegre", "Salvador", "Brasília", "Recife", "Fortaleza", "Manaus"]
-        states = ["SP", "RJ", "MG", "PR", "RS", "BA", "DF", "PE", "CE", "AM"]
-        countries = ["Brasil"]
-        companies = ["TechCorp", "DataSoft", "CloudBase", "NetSys", "InfoPrime", "ByteWorks", "CodeLab", "DevHub", "LogiTech", "SmartApp"]
-        departments = ["Engenharia", "Marketing", "Vendas", "RH", "Financeiro", "Suporte", "Produto", "Design", "QA", "DevOps"]
-        job_titles = ["Analista", "Desenvolvedor", "Gerente", "Diretor", "Estagiário", "Coordenador", "Especialista", "Consultor", "Arquiteto", "Tech Lead"]
-        statuses = ["active", "inactive", "suspended", "pending"]
-        plans = ["free", "basic", "pro", "enterprise"]
-        timezones = ["America/Sao_Paulo", "America/Manaus", "America/Bahia", "America/Recife"]
-        languages = ["pt-BR", "en-US", "es-ES"]
-        notes_list = ["Cliente VIP", "Novo cadastro", "Pendente revisão", "Sem observações", "Conta migrada", "Suporte prioritário"]
-
-        base_date = datetime(2020, 1, 1)
-
-        for i in range(1, 401):
-            fname = random.choice(first_names)
-            lname = random.choice(last_names)
-            city_idx = random.randint(0, len(cities) - 1)
-            birth = base_date - timedelta(days=random.randint(7000, 20000))
-            hire = base_date + timedelta(days=random.randint(0, 1800))
-            age = (datetime.now() - birth).days // 365
-            salary = round(random.uniform(2500, 35000), 2)
-            last_login = datetime.now() - timedelta(hours=random.randint(1, 2000))
-            created = base_date + timedelta(days=random.randint(0, 1500))
-            updated = created + timedelta(days=random.randint(0, 500))
-
-            table.add_row(
-                str(i),
-                fname,
-                lname,
-                f"{fname.lower()}.{lname.lower()}@email.com",
-                f"+55 11 9{random.randint(1000, 9999)}-{random.randint(1000, 9999)}",
-                birth.strftime("%Y-%m-%d"),
-                str(age),
-                random.choice(["M", "F"]),
-                f"Rua {random.randint(1, 999)}, {random.randint(1, 500)}",
-                cities[city_idx],
-                states[city_idx],
-                random.choice(countries),
-                f"{random.randint(10000, 99999)}-{random.randint(100, 999)}",
-                random.choice(companies),
-                random.choice(departments),
-                random.choice(job_titles),
-                f"{salary:,.2f}",
-                hire.strftime("%Y-%m-%d"),
-                random.choice(["true", "false"]),
-                f"{fname.lower()}.{lname.lower()}{random.randint(1, 99)}",
-                random.choice(statuses),
-                str(random.randint(0, 500)),
-                last_login.strftime("%Y-%m-%d %H:%M"),
-                f"{random.uniform(1, 5):.1f}",
-                str(random.randint(0, 150)),
-                f"{random.uniform(100, 50000):.2f}",
-                random.choice(plans),
-                random.choice(["true", "false"]),
-                random.choice(timezones),
-                random.choice(languages),
-                random.choice(notes_list),
-                str(random.randint(0, 20)),
-                f"{random.uniform(0, 5000):.2f}",
-                created.strftime("%Y-%m-%d %H:%M"),
-                updated.strftime("%Y-%m-%d %H:%M"),
-            )
+    def _on_query_error(self, error: str) -> None:
+        table = self.query_one("#data_table", DataTable)
+        table.loading = False
+        self.notify(f"Query error: {error}", severity="error")
 
 
 if __name__ == "__main__":
-    app = TextualApp(ansi_color=True)
+    app = TextualApp()
     app.run()

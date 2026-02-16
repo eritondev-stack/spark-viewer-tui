@@ -32,10 +32,12 @@ class SparkManager:
 
         _suppress_spark_logs()
 
-        # Redirect stderr to suppress JVM log output on the TUI
+        # Redirect both stdout and stderr to suppress JVM log output on the TUI
+        old_stdout = os.dup(1)
         old_stderr = os.dup(2)
         devnull = os.open(os.devnull, os.O_WRONLY)
-        os.dup2(devnull, 2)
+        os.dup2(devnull, 1)  # Redirect stdout
+        os.dup2(devnull, 2)  # Redirect stderr
 
         try:
             builder = (
@@ -62,7 +64,9 @@ class SparkManager:
             self._session = SparkSession.getActiveSession() or builder.getOrCreate()
             self._session.sparkContext.setLogLevel("OFF")
         finally:
-            os.dup2(old_stderr, 2)
+            os.dup2(old_stdout, 1)  # Restore stdout
+            os.dup2(old_stderr, 2)  # Restore stderr
+            os.close(old_stdout)
             os.close(old_stderr)
             os.close(devnull)
 

@@ -1,8 +1,9 @@
 import os
 from rich.console import COLOR_SYSTEMS
 from rich.text import Text
-from textual import work
+from textual import work, events
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Container, Vertical
 from textual.widgets import TextArea, DataTable, Static, Tree
 
@@ -36,9 +37,8 @@ ALL_THEME_CLASSES = {"dracula", "solid-dark", "gruvbox"}
 APP_BINDINGS = [
     ("F2", "Spark Config"),
     ("^S", "Start Spark"),
-    ("^E", "Run SQL"),
+    ("^Enter", "Run SQL"),
     ("^T", "Theme"),
-    ("^P", "Commands"),
 ]
 
 COLOR_DEFAULT_TRANSPARENT = {
@@ -58,13 +58,21 @@ class StatusBar(Static):
         super().__init__(id="status-bar")
         self._accent = "#c026d3"
         self._text_color = "#e0e0e0"
+        self._extra_bindings: list[tuple[str, str]] = []
 
     def render(self) -> Text:
         t = Text()
         for key, desc in APP_BINDINGS:
             t.append(f" {key} ", style=f"bold {COLOR_DEFAULT_TRANSPARENT['lime']}")
             t.append(f"{desc} ", style=self._text_color)
+        for key, desc in self._extra_bindings:
+            t.append(f" {key} ", style=f"bold {COLOR_DEFAULT_TRANSPARENT['lime']}")
+            t.append(f"{desc} ", style=self._text_color)
         return t
+
+    def set_extra_bindings(self, bindings: list[tuple[str, str]]) -> None:
+        self._extra_bindings = bindings
+        self.refresh()
 
     def set_colors(self, accent: str, text_color: str) -> None:
         self._accent = accent
@@ -76,8 +84,6 @@ class Sidebar(Static):
     """Barra lateral da aplicacao"""
 
     def compose(self) -> ComposeResult:
-        # yield Static("Spark TUI", id="title")
-        # yield Static("────────────────────", id="separator")
         tree: Tree[str] = Tree("Databases", id="db-tree")
         tree.root.expand()
         yield tree
@@ -86,11 +92,14 @@ class Sidebar(Static):
 class TextualApp(App):
     """Aplicacao principal Textual"""
 
+    ENABLE_COMMAND_PALETTE = False
+
     BINDINGS = [
         ("f2", "open_config", "Spark Config"),
         ("ctrl+s", "start_spark", "Start Spark"),
-        ("ctrl+e", "execute_query", "Run SQL"),
+        Binding("ctrl+enter", "execute_query", "Run SQL", priority=True),
         ("ctrl+t", "cycle_theme", "Change Theme"),
+        Binding("ctrl+w", "toggle_maximize", "Maximize", priority=True),
     ]
 
     CSS = fr"""
@@ -204,6 +213,14 @@ class TextualApp(App):
         background: transparent;
     }}
 
+    DataTable > .datatable--header-hover {{
+        background: transparent;
+    }}
+
+    DataTable > .datatable--hover {{
+        background: transparent;
+    }}
+
     DataTable > .datatable--cursor {{
         background: {COLOR_DEFAULT_TRANSPARENT['blue']};
     }}
@@ -221,6 +238,11 @@ class TextualApp(App):
         height: 1;
         width: 1fr;
         background: transparent;
+    }}
+
+    ToastRack {{
+        dock: top;
+        align-horizontal: right;
     }}
 
     /* ══════════ Dracula Theme ══════════ */
@@ -375,6 +397,17 @@ class TextualApp(App):
     Screen.gruvbox #status-bar {{
         background: #282828;
     }}
+
+    /* ══════════ Focus Highlight (after themes to win specificity) ══════════ */
+    Screen Sidebar:focus-within {{
+        border: solid {COLOR_DEFAULT_TRANSPARENT['magenta']};
+    }}
+    Screen TextArea:focus {{
+        border: solid {COLOR_DEFAULT_TRANSPARENT['magenta']};
+    }}
+    Screen DataTable:focus {{
+        border: solid {COLOR_DEFAULT_TRANSPARENT['magenta']};
+    }}
     """
 
     def __init__(self):
@@ -382,6 +415,7 @@ class TextualApp(App):
         self._config = load_config()
         self._spark = SparkManager()
         self._current_theme = "Dracula"
+        self._maximized_widget = None
 
     def compose(self) -> ComposeResult:
         yield Sidebar()
@@ -413,6 +447,22 @@ class TextualApp(App):
         t.append("─" * 16, style="dim")
         return t
 
+    # ── Focus tracking ───────────────────────────────────────
+
+    def on_descendant_focus(self, event: events.DescendantFocus) -> None:
+        self._update_focus_bindings()
+
+    def on_descendant_blur(self, event: events.DescendantBlur) -> None:
+        self._update_focus_bindings()
+
+    def _update_focus_bindings(self) -> None:
+        focused = self.screen.focused
+        status = self.query_one("#status-bar", StatusBar)
+        if isinstance(focused, (TextArea, DataTable)):
+            status.set_extra_bindings([("^W", "Maximize")])
+        else:
+            status.set_extra_bindings([])
+
     # ── Theme cycling ────────────────────────────────────────
 
     def _apply_theme(self, theme_name: str) -> None:
@@ -441,6 +491,38 @@ class TextualApp(App):
         next_name = THEME_NAMES[next_idx]
         self._apply_theme(next_name)
         self.notify(f"Theme: {next_name}")
+
+    # ── Maximize toggle ──────────────────────────────────────
+
+    def action_toggle_maximize(self) -> None:
+        """Toggle maximize for focused TextArea or DataTable."""
+        sidebar = self.query_one("Sidebar")
+        text_area = self.query_one("#input_text", TextArea)
+        data_table = self.query_one("#data_table", DataTable)
+
+        if self._maximized_widget:
+            # Restore all
+            sidebar.display = True
+            text_area.display = True
+            data_table.display = True
+            text_area.styles.height = 10
+            text_area.styles.border = None
+            data_table.styles.border = None
+            self._maximized_widget = None
+            return
+
+        focused = self.screen.focused
+        if isinstance(focused, TextArea):
+            sidebar.display = False
+            data_table.display = False
+            text_area.styles.height = "1fr"
+            text_area.styles.border = ("none", "transparent")
+            self._maximized_widget = focused
+        elif isinstance(focused, DataTable):
+            sidebar.display = False
+            text_area.display = False
+            data_table.styles.border = ("none", "transparent")
+            self._maximized_widget = focused
 
     # ── Config popup ─────────────────────────────────────────
 
@@ -472,6 +554,7 @@ class TextualApp(App):
             self.notify("Configure Spark paths first (F2).", severity="error")
             return
         self.notify("Starting Spark session...")
+        self.query_one("Sidebar").loading = True
         self._start_spark_worker(metastore, warehouse)
 
     @work(thread=True, exclusive=True)
@@ -487,10 +570,15 @@ class TextualApp(App):
         except Exception as e:
             import traceback
             error_msg = f"Spark error: {str(e)}"
-            self.app.call_from_thread(self.notify, error_msg, severity="error")
+            self.app.call_from_thread(self._on_spark_error, error_msg)
             print(f"ERROR in Spark worker:\n{traceback.format_exc()}")
 
+    def _on_spark_error(self, error_msg: str) -> None:
+        self.query_one("Sidebar").loading = False
+        self.notify(error_msg, severity="error")
+
     def _on_spark_ready(self, catalog_data: dict[str, list[str]]) -> None:
+        self.query_one("Sidebar").loading = False
         self.notify("Spark session started!")
         self._populate_tree(catalog_data)
 

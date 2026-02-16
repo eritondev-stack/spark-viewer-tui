@@ -4,48 +4,101 @@ from textual.screen import ModalScreen
 from textual.widgets import Input, Button, Label
 
 
+COLOR_DEFAULT_TRANSPARENT = {
+    "blue": "#4d4dca",
+    "aqua": "#45afb3",
+    "magenta": "#c848b7",
+    "yellow": "#fcff00",
+    "lime": "#01f649",
+    "neutro": "#676667",
+}
+
+
 class SparkConfigScreen(ModalScreen[dict | None]):
     """Modal screen for Spark configuration."""
 
-    CSS = """
-    SparkConfigScreen {
+    CSS = f"""
+    SparkConfigScreen {{
         align: center middle;
-    }
+        background: transparent;
+    }}
 
-    #dialog {
+    #dialog {{
         grid-size: 2;
         grid-gutter: 1 2;
         grid-rows: auto auto auto auto auto;
         padding: 1 2;
         width: 70;
         height: 21;
-        border: thick $background 80%;
-        background: $surface;
-    }
+        border: solid {COLOR_DEFAULT_TRANSPARENT['neutro']};
+        background: transparent;
+        color: #e0e0e0;
+    }}
 
-    #title {
+    #title {{
         column-span: 2;
         height: auto;
         width: 1fr;
         content-align: center middle;
         text-style: bold;
-    }
+        color: {COLOR_DEFAULT_TRANSPARENT['magenta']};
+        background: transparent;
+    }}
 
-    .label {
+    .label {{
         column-span: 2;
         height: auto;
         width: 1fr;
-    }
+        background: transparent;
+        color: #e0e0e0;
+    }}
 
-    .input {
+    .input {{
         column-span: 2;
         height: auto;
         width: 1fr;
-    }
+    }}
 
-    Button {
+    Input {{
+        background: transparent;
+        border: solid {COLOR_DEFAULT_TRANSPARENT['neutro']};
+        color: #e0e0e0;
+    }}
+
+    Input:focus {{
+        border: solid {COLOR_DEFAULT_TRANSPARENT['magenta']};
+    }}
+
+    Button {{
         width: 100%;
-    }
+        background: transparent;
+        border: none;
+        color: #e0e0e0;
+        text-style: bold;
+        height: 3;
+    }}
+
+    Button:hover {{
+        background: {COLOR_DEFAULT_TRANSPARENT['neutro']} 30%;
+        color: #ffffff;
+    }}
+
+    Button:focus {{
+        background: {COLOR_DEFAULT_TRANSPARENT['neutro']} 20%;
+        color: #ffffff;
+    }}
+
+    #btn-save {{
+        color: {COLOR_DEFAULT_TRANSPARENT['lime']};
+    }}
+
+    #btn-save:hover {{
+        background: {COLOR_DEFAULT_TRANSPARENT['lime']} 20%;
+    }}
+
+    #btn-cancel {{
+        color: {COLOR_DEFAULT_TRANSPARENT['neutro']};
+    }}
     """
 
     def __init__(self, current_config: dict):
@@ -69,8 +122,8 @@ class SparkConfigScreen(ModalScreen[dict | None]):
                 id="input-warehouse",
                 classes="input",
             ),
-            Button("Save", variant="primary", id="btn-save"),
-            Button("Cancel", variant="default", id="btn-cancel"),
+            Button("Save", id="btn-save"),
+            Button("Cancel", id="btn-cancel"),
             id="dialog",
         )
 

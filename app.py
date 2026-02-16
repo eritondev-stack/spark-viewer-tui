@@ -1,5 +1,4 @@
 import os
-from rich.console import COLOR_SYSTEMS
 from rich.text import Text
 from textual import work, events
 from textual.app import App, ComposeResult
@@ -10,31 +9,13 @@ from textual.widgets import TextArea, DataTable, Static, Tree
 from config import load_config, save_config
 from queries import load_queries, add_query
 from spark_manager import SparkManager
+from themes import THEME_NAMES, THEME_COLORS, BASE_THEME_CSS, THEME_CSS
 from screens.spark_config import SparkConfigScreen
 from screens.save_query import SaveQueryScreen
 from screens.load_query import LoadQueryScreen
 
 # Configure JAVA_HOME for PySpark
 os.environ["JAVA_HOME"] = "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
-
-# Theme definitions
-THEME_NAMES = ["Transparent", "Dracula", "Solid Dark", "Gruvbox"]
-
-THEME_CSS_CLASS = {
-    "Transparent": None,
-    "Dracula": "dracula",
-    "Solid Dark": "solid-dark",
-    "Gruvbox": "gruvbox",
-}
-
-THEME_COLORS = {
-    "Transparent": {"accent": "#c026d3", "text": "#e0e0e0"},
-    "Dracula": {"accent": "#bd93f9", "text": "#f8f8f2"},
-    "Solid Dark": {"accent": "#c026d3", "text": "#ffffff"},
-    "Gruvbox": {"accent": "#d79921", "text": "#ebdbb2"},
-}
-
-ALL_THEME_CLASSES = {"dracula", "solid-dark", "gruvbox"}
 
 # Bindings shown in the status bar
 APP_BINDINGS = [
@@ -46,32 +27,22 @@ APP_BINDINGS = [
     ("^T", "Theme"),
 ]
 
-COLOR_DEFAULT_TRANSPARENT = {
-    "blue": "#4d4dca",
-    "aqua": "#45afb3",
-    "magenta": "#c848b7",
-    "yellow": "#fcff00",
-    "lime": "#01f649",
-    "neutro": "#676667"
-}
-
-
 class StatusBar(Static):
     """Custom footer bar — fully transparent, no Textual Footer limitations."""
 
     def __init__(self) -> None:
         super().__init__(id="status-bar")
-        self._accent = "#c026d3"
+        self._key_color = "#01f649"
         self._text_color = "#e0e0e0"
         self._extra_bindings: list[tuple[str, str]] = []
 
     def render(self) -> Text:
         t = Text()
         for key, desc in APP_BINDINGS:
-            t.append(f" {key} ", style=f"bold {COLOR_DEFAULT_TRANSPARENT['lime']}")
+            t.append(f" {key} ", style=f"bold {self._key_color}")
             t.append(f"{desc} ", style=self._text_color)
         for key, desc in self._extra_bindings:
-            t.append(f" {key} ", style=f"bold {COLOR_DEFAULT_TRANSPARENT['lime']}")
+            t.append(f" {key} ", style=f"bold {self._key_color}")
             t.append(f"{desc} ", style=self._text_color)
         return t
 
@@ -79,8 +50,8 @@ class StatusBar(Static):
         self._extra_bindings = bindings
         self.refresh()
 
-    def set_colors(self, accent: str, text_color: str) -> None:
-        self._accent = accent
+    def set_colors(self, key_color: str, text_color: str) -> None:
+        self._key_color = key_color
         self._text_color = text_color
         self.refresh()
 
@@ -109,319 +80,131 @@ class TextualApp(App):
         Binding("ctrl+w", "toggle_maximize", "Maximize", priority=True),
     ]
 
-    CSS = fr"""
+    CSS = """
     /* ══════════ Base / Transparent Theme ══════════ */
-    Screen {{
+    Screen {
         layout: horizontal;
         background: transparent;
         color: #e0e0e0;
-    }}
+    }
 
-    Sidebar {{
+    Sidebar {
         width: 30;
         height: 1fr;
-        border: solid {COLOR_DEFAULT_TRANSPARENT['neutro']};
         padding: 1;
         background: transparent;
         color: #e0e0e0;
-    }}
+    }
 
-    Sidebar > Static {{
+    Sidebar > Static {
         background: transparent;
-    }}
+    }
 
-    #title {{
+    #title {
         text-style: bold;
-        color: #c026d3;
         text-align: center;
         background: transparent;
-    }}
+    }
 
-    #separator {{
-        color: {COLOR_DEFAULT_TRANSPARENT['neutro']};
+    #separator {
         background: transparent;
-    }}
+    }
 
-    #db-tree {{
+    #db-tree {
         background: transparent;
         color: #e0e0e0;
         padding: 0;
         scrollbar-background: transparent;
         scrollbar-background-hover: transparent;
         scrollbar-background-active: transparent;
-        scrollbar-color: magenta;
-        scrollbar-color-hover: magenta 80%;
-        scrollbar-color-active: magenta 60%;
         scrollbar-size: 1 2;
-    }}
+    }
 
-    Tree > .tree--cursor {{
-        background: {COLOR_DEFAULT_TRANSPARENT['blue']};
-    }}
-
-    Tree > .tree--guides {{
-        color: {COLOR_DEFAULT_TRANSPARENT['blue']};
-    }}
-
-    Tree > .tree--guides-hover {{
-        color: {COLOR_DEFAULT_TRANSPARENT['blue']};
-    }}
-
-    #main-container {{
+    #main-container {
         width: 1fr;
         height: 1fr;
         padding: 0;
         background: transparent;
-    }}
+    }
 
-    Vertical {{
+    Vertical {
         background: transparent;
-    }}
+    }
 
-    Container {{
+    Container {
         background: transparent;
-    }}
+    }
 
-    TextArea {{
+    TextArea {
         height: 10;
-        border: solid {COLOR_DEFAULT_TRANSPARENT['neutro']};
         padding: 0;
         background: transparent;
         color: #e0e0e0;
         scrollbar-background: transparent;
         scrollbar-background-hover: transparent;
         scrollbar-background-active: transparent;
-        scrollbar-color: {COLOR_DEFAULT_TRANSPARENT['neutro']};
-        scrollbar-color-hover: {COLOR_DEFAULT_TRANSPARENT['neutro']} 80%;
-        scrollbar-color-active: {COLOR_DEFAULT_TRANSPARENT['neutro']} 60%;
         scrollbar-size: 1 2;
-    }}
+    }
 
-    TextArea > .text-area--cursor-line {{
+    TextArea > .text-area--cursor-line {
         background: transparent;
-    }}
+    }
 
-    DataTable {{
+    DataTable {
         height: 1fr;
-        border: solid {COLOR_DEFAULT_TRANSPARENT['neutro']};
         background: transparent;
         color: #e0e0e0;
         scrollbar-background: transparent;
         scrollbar-background-hover: transparent;
         scrollbar-background-active: transparent;
-        scrollbar-color: {COLOR_DEFAULT_TRANSPARENT['neutro']};
-        scrollbar-color-hover: {COLOR_DEFAULT_TRANSPARENT['neutro']} 80%;
-        scrollbar-color-active: {COLOR_DEFAULT_TRANSPARENT['neutro']} 60%;
         scrollbar-size: 1 2;
         scrollbar-corner-color: transparent;
-    }}
+    }
 
-    DataTable > .datatable--header {{
+    DataTable > .datatable--header {
         background: transparent;
-    }}
+    }
 
-    DataTable > .datatable--header-hover {{
+    DataTable > .datatable--header-hover {
         background: transparent;
-    }}
+    }
 
-    DataTable > .datatable--hover {{
+    DataTable > .datatable--hover {
         background: transparent;
-    }}
+    }
 
-    DataTable > .datatable--cursor {{
-        background: {COLOR_DEFAULT_TRANSPARENT['blue']};
-    }}
-
-    Static {{
+    DataTable > .datatable--cursor {
         background: transparent;
-    }}
+    }
 
-    LoadingIndicator {{
+    Static {
         background: transparent;
-    }}
+    }
 
-    #status-bar {{
+    LoadingIndicator {
+        background: transparent;
+    }
+
+    #status-bar {
         dock: bottom;
         height: 1;
         width: 1fr;
         background: transparent;
-    }}
+    }
 
-    ToastRack {{
+    ToastRack {
         dock: top;
         align-horizontal: right;
-    }}
-
-    /* ══════════ Dracula Theme ══════════ */
-    Screen.dracula {{
-        background: #282a36;
-        color: #f8f8f2;
-    }}
-    Screen.dracula Sidebar {{
-        background: #282a36;
-        border: solid #bd93f9;
-        color: #f8f8f2;
-    }}
-    Screen.dracula Sidebar > Static {{
-        background: #282a36;
-    }}
-    Screen.dracula #title {{
-        color: #bd93f9;
-        background: #282a36;
-    }}
-    Screen.dracula #separator {{
-        color: #bd93f9;
-        background: #282a36;
-    }}
-    Screen.dracula #db-tree {{
-        background: #282a36;
-        color: #f8f8f2;
-    }}
-    Screen.dracula #main-container {{
-        background: #282a36;
-    }}
-    Screen.dracula Vertical {{
-        background: #282a36;
-    }}
-    Screen.dracula Container {{
-        background: #282a36;
-    }}
-    Screen.dracula TextArea {{
-        background: #282a36;
-        border: solid #bd93f9;
-        color: #f8f8f2;
-    }}
-    Screen.dracula DataTable {{
-        background: #282a36;
-        border: solid #bd93f9;
-        color: #f8f8f2;
-    }}
-    Screen.dracula Static {{
-        background: #282a36;
-    }}
-    Screen.dracula #status-bar {{
-        background: #282a36;
-    }}
-
-    /* ══════════ Solid Dark Theme ══════════ */
-    Screen.solid-dark {{
-        background: #0a0a0a;
-        color: #ffffff;
-    }}
-    Screen.solid-dark Sidebar {{
-        background: #0a0a0a;
-        border: solid #c026d3;
-        color: #ffffff;
-    }}
-    Screen.solid-dark Sidebar > Static {{
-        background: #0a0a0a;
-    }}
-    Screen.solid-dark #title {{
-        color: #c026d3;
-        background: #0a0a0a;
-    }}
-    Screen.solid-dark #separator {{
-        color: #c026d3;
-        background: #0a0a0a;
-    }}
-    Screen.solid-dark #db-tree {{
-        background: #0a0a0a;
-        color: #ffffff;
-    }}
-    Screen.solid-dark #main-container {{
-        background: #0a0a0a;
-    }}
-    Screen.solid-dark Vertical {{
-        background: #0a0a0a;
-    }}
-    Screen.solid-dark Container {{
-        background: #0a0a0a;
-    }}
-    Screen.solid-dark TextArea {{
-        background: #0a0a0a;
-        border: solid #c026d3;
-        color: #ffffff;
-    }}
-    Screen.solid-dark DataTable {{
-        background: #0a0a0a;
-        border: solid #c026d3;
-        color: #ffffff;
-    }}
-    Screen.solid-dark Static {{
-        background: #0a0a0a;
-    }}
-    Screen.solid-dark #status-bar {{
-        background: #0a0a0a;
-    }}
-
-    /* ══════════ Gruvbox Theme ══════════ */
-    Screen.gruvbox {{
-        background: #282828;
-        color: #ebdbb2;
-    }}
-    Screen.gruvbox Sidebar {{
-        background: #282828;
-        border: solid #d79921;
-        color: #ebdbb2;
-    }}
-    Screen.gruvbox Sidebar > Static {{
-        background: #282828;
-    }}
-    Screen.gruvbox #title {{
-        color: #d79921;
-        background: #282828;
-    }}
-    Screen.gruvbox #separator {{
-        color: #d79921;
-        background: #282828;
-    }}
-    Screen.gruvbox #db-tree {{
-        background: #282828;
-        color: #ebdbb2;
-    }}
-    Screen.gruvbox #main-container {{
-        background: #282828;
-    }}
-    Screen.gruvbox Vertical {{
-        background: #282828;
-    }}
-    Screen.gruvbox Container {{
-        background: #282828;
-    }}
-    Screen.gruvbox TextArea {{
-        background: #282828;
-        border: solid #d79921;
-        color: #ebdbb2;
-    }}
-    Screen.gruvbox DataTable {{
-        background: #282828;
-        border: solid #d79921;
-        color: #ebdbb2;
-    }}
-    Screen.gruvbox Static {{
-        background: #282828;
-    }}
-    Screen.gruvbox #status-bar {{
-        background: #282828;
-    }}
-
-    /* ══════════ Focus Highlight (after themes to win specificity) ══════════ */
-    Screen Sidebar:focus-within {{
-        border: solid {COLOR_DEFAULT_TRANSPARENT['magenta']};
-    }}
-    Screen TextArea:focus {{
-        border: solid {COLOR_DEFAULT_TRANSPARENT['magenta']};
-    }}
-    Screen DataTable:focus {{
-        border: solid {COLOR_DEFAULT_TRANSPARENT['magenta']};
-    }}
-    """
+    }
+    """ + BASE_THEME_CSS + THEME_CSS
 
     def __init__(self):
         super().__init__(ansi_color=True)
         self._config = load_config()
         self._spark = SparkManager()
-        self._current_theme = "Dracula"
+        self._theme_names = THEME_NAMES
+        self._theme_colors = THEME_COLORS
+        self._current_theme = self._theme_names[0]
         self._maximized_widget = None
 
     def compose(self) -> ComposeResult:
@@ -436,8 +219,8 @@ class TextualApp(App):
         table = self.query_one("#data_table", DataTable)
         table.add_column(self._make_header("", "No data loaded"), width=30)
 
-        # Apply Dracula as default theme
-        self._apply_theme("Dracula")
+        # Apply first theme as default
+        self._apply_theme(self._theme_names[0])
 
         if self._config.get("metastore_db") and self._config.get("warehouse_dir"):
             self.notify("Config loaded. Ctrl+S to start Spark.")
@@ -445,11 +228,12 @@ class TextualApp(App):
             self.notify("F2 to configure Spark paths.")
 
     def _make_header(self, col_type: str, col_name: str) -> Text:
+        colors = self._theme_colors[self._current_theme]
         t = Text()
         t.append(col_name, style="bold")
         if col_type:
             t.append("\n")
-            t.append(col_type, style=f"dim italic {COLOR_DEFAULT_TRANSPARENT['yellow']}")
+            t.append(col_type, style=f"dim italic {colors['col_type_color']}")
         t.append("\n")
         t.append("─" * 16, style="dim")
         return t
@@ -474,16 +258,19 @@ class TextualApp(App):
 
     def _apply_theme(self, theme_name: str) -> None:
         """Apply theme via CSS classes + status bar colors."""
-        for cls in ALL_THEME_CLASSES:
-            self.screen.remove_class(cls)
+        # Remove all theme classes
+        for name in self._theme_names:
+            css_class = name.lower().replace(" ", "-")
+            self.screen.remove_class(css_class)
 
-        css_class = THEME_CSS_CLASS.get(theme_name)
-        if css_class:
+        # Add new theme class (first theme uses base CSS, no class needed)
+        if theme_name != self._theme_names[0]:
+            css_class = theme_name.lower().replace(" ", "-")
             self.screen.add_class(css_class)
 
-        colors = THEME_COLORS[theme_name]
+        colors = self._theme_colors[theme_name]
         self.query_one("#status-bar", StatusBar).set_colors(
-            colors["accent"], colors["text"]
+            colors["key_color"], colors["text"]
         )
 
         self._current_theme = theme_name
@@ -491,13 +278,13 @@ class TextualApp(App):
     def action_cycle_theme(self) -> None:
         """Cycle through available themes"""
         try:
-            idx = THEME_NAMES.index(self._current_theme)
+            idx = self._theme_names.index(self._current_theme)
         except ValueError:
             idx = 0
-        next_idx = (idx + 1) % len(THEME_NAMES)
-        next_name = THEME_NAMES[next_idx]
+        next_idx = (idx + 1) % len(self._theme_names)
+        next_name = self._theme_names[next_idx]
         self._apply_theme(next_name)
-        self.notify(f"Theme: {next_name}")
+        # self.notify(f"Theme: {next_name}")
 
     # ── Maximize toggle ──────────────────────────────────────
 
@@ -539,7 +326,7 @@ class TextualApp(App):
         if not sql:
             self.notify("Write a query first.", severity="warning")
             return
-        self.push_screen(SaveQueryScreen(sql), self._on_query_saved)
+        self.push_screen(SaveQueryScreen(sql, self._current_theme), self._on_query_saved)
 
     def _on_query_saved(self, name: str | None) -> None:
         if name is None:
@@ -553,7 +340,7 @@ class TextualApp(App):
         if not queries:
             self.notify("No saved queries.", severity="warning")
             return
-        self.push_screen(LoadQueryScreen(queries), self._on_query_loaded)
+        self.push_screen(LoadQueryScreen(queries, self._current_theme), self._on_query_loaded)
 
     def _on_query_loaded(self, sql: str | None) -> None:
         if sql is None:
@@ -567,7 +354,7 @@ class TextualApp(App):
     def action_open_config(self) -> None:
         """Open Spark configuration modal"""
         try:
-            screen = SparkConfigScreen(self._config)
+            screen = SparkConfigScreen(self._config, self._current_theme)
             self.push_screen(screen, self._on_config_saved)
         except Exception as e:
             self.notify(f"Error opening config: {e}", severity="error")

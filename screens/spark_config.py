@@ -3,107 +3,69 @@ from textual.containers import Grid
 from textual.screen import ModalScreen
 from textual.widgets import Input, Button, Label
 
-
-COLOR_DEFAULT_TRANSPARENT = {
-    "blue": "#4d4dca",
-    "aqua": "#45afb3",
-    "magenta": "#c848b7",
-    "yellow": "#fcff00",
-    "lime": "#01f649",
-    "neutro": "#676667",
-}
+from themes import MODAL_BASE_CSS, MODAL_THEME_CSS, THEME_NAMES
 
 
 class SparkConfigScreen(ModalScreen[dict | None]):
     """Modal screen for Spark configuration."""
 
-    CSS = f"""
-    SparkConfigScreen {{
+    CSS = """
+    SparkConfigScreen {
         align: center middle;
         background: transparent;
-    }}
+    }
 
-    #dialog {{
+    #dialog {
         grid-size: 2;
         grid-gutter: 1 2;
         grid-rows: auto auto auto auto auto;
         padding: 1 2;
         width: 70;
         height: 21;
-        border: solid {COLOR_DEFAULT_TRANSPARENT['neutro']};
-        background: transparent;
-        color: #e0e0e0;
-    }}
+    }
 
-    #title {{
+    #title {
         column-span: 2;
         height: auto;
         width: 1fr;
         content-align: center middle;
         text-style: bold;
-        color: {COLOR_DEFAULT_TRANSPARENT['magenta']};
-        background: transparent;
-    }}
+    }
 
-    .label {{
+    .label {
         column-span: 2;
         height: auto;
         width: 1fr;
-        background: transparent;
-        color: #e0e0e0;
-    }}
+    }
 
-    .input {{
+    .input {
         column-span: 2;
         height: auto;
         width: 1fr;
-    }}
+    }
 
-    Input {{
-        background: transparent;
-        border: solid {COLOR_DEFAULT_TRANSPARENT['neutro']};
-        color: #e0e0e0;
-    }}
-
-    Input:focus {{
-        border: solid {COLOR_DEFAULT_TRANSPARENT['magenta']};
-    }}
-
-    Button {{
+    Button {
         width: 100%;
-        background: transparent;
         border: none;
-        color: #e0e0e0;
         text-style: bold;
         height: 3;
-    }}
+    }
+    """ + MODAL_BASE_CSS + MODAL_THEME_CSS
 
-    Button:hover {{
-        background: {COLOR_DEFAULT_TRANSPARENT['neutro']} 30%;
-        color: #ffffff;
-    }}
+    BINDINGS = [("escape", "cancel", "Cancel")]
 
-    Button:focus {{
-        background: {COLOR_DEFAULT_TRANSPARENT['neutro']} 20%;
-        color: #ffffff;
-    }}
-
-    #btn-save {{
-        color: {COLOR_DEFAULT_TRANSPARENT['lime']};
-    }}
-
-    #btn-save:hover {{
-        background: {COLOR_DEFAULT_TRANSPARENT['lime']} 20%;
-    }}
-
-    #btn-cancel {{
-        color: {COLOR_DEFAULT_TRANSPARENT['neutro']};
-    }}
-    """
-
-    def __init__(self, current_config: dict):
+    def __init__(self, current_config: dict, theme_name: str = ""):
         super().__init__()
         self._current_config = current_config
+        self._theme_name = theme_name
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def on_mount(self) -> None:
+        if self._theme_name and THEME_NAMES and self._theme_name != THEME_NAMES[0]:
+            css_class = self._theme_name.lower().replace(" ", "-")
+            self.add_class(css_class)
 
     def compose(self) -> ComposeResult:
         yield Grid(

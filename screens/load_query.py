@@ -6,16 +6,7 @@ from textual.widgets import OptionList, Button, Label
 from textual.widgets.option_list import Option
 
 from queries import delete_query
-
-
-COLOR_DEFAULT_TRANSPARENT = {
-    "blue": "#4d4dca",
-    "aqua": "#45afb3",
-    "magenta": "#c848b7",
-    "yellow": "#fcff00",
-    "lime": "#01f649",
-    "neutro": "#676667",
-}
+from themes import MODAL_BASE_CSS, MODAL_THEME_CSS, THEME_NAMES
 
 
 def _make_option(name: str, sql: str, max_width: int = 60) -> Option:
@@ -33,106 +24,67 @@ def _make_option(name: str, sql: str, max_width: int = 60) -> Option:
 class LoadQueryScreen(ModalScreen[str | None]):
     """Modal to select and load a saved query."""
 
-    CSS = f"""
-    LoadQueryScreen {{
+    CSS = """
+    LoadQueryScreen {
         align: center middle;
         background: transparent;
-    }}
+    }
 
-    #dialog {{
+    #dialog {
         padding: 1 2;
         width: 90;
         height: 22;
-        border: solid {COLOR_DEFAULT_TRANSPARENT['neutro']};
-        background: transparent;
-        color: #e0e0e0;
         layout: vertical;
-    }}
+    }
 
-    #title {{
+    #title {
         height: auto;
         width: 1fr;
         content-align: center middle;
         text-style: bold;
-        color: {COLOR_DEFAULT_TRANSPARENT['magenta']};
-        background: transparent;
-    }}
+    }
 
-    OptionList {{
+    OptionList {
         height: 1fr;
-        background: transparent;
-        border: solid {COLOR_DEFAULT_TRANSPARENT['neutro']};
-        color: #e0e0e0;
         scrollbar-background: transparent;
-        scrollbar-color: {COLOR_DEFAULT_TRANSPARENT['neutro']};
         scrollbar-size: 1 2;
         margin: 1 0;
-    }}
+    }
 
-    OptionList > .option-list--option-highlighted {{
-        background: {COLOR_DEFAULT_TRANSPARENT['blue']};
-    }}
-
-    OptionList > .option-list--option-hover {{
+    OptionList > .option-list--option-hover {
         background: transparent;
-    }}
+    }
 
-    #button-row {{
+    #button-row {
         height: auto;
         width: 1fr;
         align: center middle;
-    }}
+    }
 
-    Button {{
+    Button {
         width: 1fr;
-        background: transparent;
         border: none;
-        color: #e0e0e0;
         text-style: bold;
         height: 3;
         margin: 0 1;
-    }}
-
-    Button:hover {{
-        background: {COLOR_DEFAULT_TRANSPARENT['neutro']} 30%;
-        color: #ffffff;
-    }}
-
-    Button:focus {{
-        background: {COLOR_DEFAULT_TRANSPARENT['neutro']} 20%;
-        color: #ffffff;
-    }}
-
-    #btn-load {{
-        color: {COLOR_DEFAULT_TRANSPARENT['lime']};
-    }}
-
-    #btn-load:hover {{
-        background: {COLOR_DEFAULT_TRANSPARENT['lime']} 20%;
-    }}
-
-    #btn-delete {{
-        color: {COLOR_DEFAULT_TRANSPARENT['yellow']};
-    }}
-
-    #btn-delete:hover {{
-        background: {COLOR_DEFAULT_TRANSPARENT['yellow']} 20%;
-    }}
-
-    #btn-cancel {{
-        color: {COLOR_DEFAULT_TRANSPARENT['neutro']};
-    }}
-    """
+    }
+    """ + MODAL_BASE_CSS + MODAL_THEME_CSS
 
     BINDINGS = [("escape", "cancel", "Cancel")]
 
-    def __init__(self, queries: dict[str, str]):
+    def __init__(self, queries: dict[str, str], theme_name: str = ""):
         super().__init__()
         self._queries = dict(queries)
         self._names = list(queries.keys())
+        self._theme_name = theme_name
 
     def action_cancel(self) -> None:
         self.dismiss(None)
+
+    def on_mount(self) -> None:
+        if self._theme_name and THEME_NAMES and self._theme_name != THEME_NAMES[0]:
+            css_class = self._theme_name.lower().replace(" ", "-")
+            self.add_class(css_class)
 
     def compose(self) -> ComposeResult:
         yield Label("Load Query", id="title")

@@ -1,9 +1,10 @@
 import os
+from rich.console import COLOR_SYSTEMS
 from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical
-from textual.widgets import TextArea, DataTable, Static, Tree, Footer
+from textual.widgets import TextArea, DataTable, Static, Tree
 
 from config import load_config, save_config
 from spark_manager import SparkManager
@@ -12,10 +13,9 @@ from screens.spark_config import SparkConfigScreen
 # Configure JAVA_HOME for PySpark
 os.environ["JAVA_HOME"] = "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
 
-# Theme names for cycling (Ctrl+T)
+# Theme definitions
 THEME_NAMES = ["Transparent", "Dracula", "Solid Dark", "Gruvbox"]
 
-# CSS class to add to Screen for each theme (None = no class = transparent defaults)
 THEME_CSS_CLASS = {
     "Transparent": None,
     "Dracula": "dracula",
@@ -23,15 +23,61 @@ THEME_CSS_CLASS = {
     "Gruvbox": "gruvbox",
 }
 
+THEME_COLORS = {
+    "Transparent": {"accent": "#c026d3", "text": "#e0e0e0"},
+    "Dracula": {"accent": "#bd93f9", "text": "#f8f8f2"},
+    "Solid Dark": {"accent": "#c026d3", "text": "#ffffff"},
+    "Gruvbox": {"accent": "#d79921", "text": "#ebdbb2"},
+}
+
 ALL_THEME_CLASSES = {"dracula", "solid-dark", "gruvbox"}
+
+# Bindings shown in the status bar
+APP_BINDINGS = [
+    ("F2", "Spark Config"),
+    ("^S", "Start Spark"),
+    ("^E", "Run SQL"),
+    ("^T", "Theme"),
+    ("^P", "Commands"),
+]
+
+COLOR_DEFAULT_TRANSPARENT = {
+    "blue": "#4d4dca",
+    "aqua": "#45afb3",
+    "magenta": "#c848b7",
+    "yellow": "#fcff00",
+    "lime": "#01f649",
+    "neutro": "#676667"
+}
+
+
+class StatusBar(Static):
+    """Custom footer bar — fully transparent, no Textual Footer limitations."""
+
+    def __init__(self) -> None:
+        super().__init__(id="status-bar")
+        self._accent = "#c026d3"
+        self._text_color = "#e0e0e0"
+
+    def render(self) -> Text:
+        t = Text()
+        for key, desc in APP_BINDINGS:
+            t.append(f" {key} ", style=f"bold {COLOR_DEFAULT_TRANSPARENT['lime']}")
+            t.append(f"{desc} ", style=self._text_color)
+        return t
+
+    def set_colors(self, accent: str, text_color: str) -> None:
+        self._accent = accent
+        self._text_color = text_color
+        self.refresh()
 
 
 class Sidebar(Static):
     """Barra lateral da aplicacao"""
 
     def compose(self) -> ComposeResult:
-        yield Static("Spark TUI", id="title")
-        yield Static("────────────────────", id="separator")
+        # yield Static("Spark TUI", id="title")
+        # yield Static("────────────────────", id="separator")
         tree: Tree[str] = Tree("Databases", id="db-tree")
         tree.root.expand()
         yield tree
@@ -47,44 +93,40 @@ class TextualApp(App):
         ("ctrl+t", "cycle_theme", "Change Theme"),
     ]
 
-    CSS = """
+    CSS = fr"""
     /* ══════════ Base / Transparent Theme ══════════ */
-    Screen {
+    Screen {{
         layout: horizontal;
         background: transparent;
         color: #e0e0e0;
-    }
+    }}
 
-    Sidebar {
+    Sidebar {{
         width: 30;
         height: 1fr;
-        border: solid #c026d3;
+        border: solid {COLOR_DEFAULT_TRANSPARENT['neutro']};
         padding: 1;
         background: transparent;
         color: #e0e0e0;
-    }
+    }}
 
-    Sidebar > Static {
+    Sidebar > Static {{
         background: transparent;
-    }
+    }}
 
-    #title {
+    #title {{
         text-style: bold;
         color: #c026d3;
         text-align: center;
         background: transparent;
-    }
+    }}
 
-    #separator {
-        color: #c026d3;
+    #separator {{
+        color: {COLOR_DEFAULT_TRANSPARENT['neutro']};
         background: transparent;
-    }
+    }}
 
-    Label {
-        color: #e0e0e0;
-    }
-
-    #db-tree {
+    #db-tree {{
         background: transparent;
         color: #e0e0e0;
         padding: 0;
@@ -95,240 +137,244 @@ class TextualApp(App):
         scrollbar-color-hover: magenta 80%;
         scrollbar-color-active: magenta 60%;
         scrollbar-size: 1 2;
-    }
+    }}
 
-    Tree > .tree--cursor {
-        background: #c026d3;
-    }
+    Tree > .tree--cursor {{
+        background: {COLOR_DEFAULT_TRANSPARENT['blue']};
+    }}
 
-    Tree > .tree--guides {
-        color: #c026d3;
-    }
+    Tree > .tree--guides {{
+        color: {COLOR_DEFAULT_TRANSPARENT['blue']};
+    }}
 
-    Tree > .tree--guides-hover {
-        color: magenta;
-    }
+    Tree > .tree--guides-hover {{
+        color: {COLOR_DEFAULT_TRANSPARENT['blue']};
+    }}
 
-    #main-container {
+    #main-container {{
         width: 1fr;
         height: 1fr;
         padding: 0;
         background: transparent;
-    }
+    }}
 
-    Vertical {
+    Vertical {{
         background: transparent;
-    }
+    }}
 
-    Container {
+    Container {{
         background: transparent;
-    }
+    }}
 
-    TextArea {
+    TextArea {{
         height: 10;
-        border: solid #c026d3;
+        border: solid {COLOR_DEFAULT_TRANSPARENT['neutro']};
         padding: 0;
         background: transparent;
         color: #e0e0e0;
         scrollbar-background: transparent;
         scrollbar-background-hover: transparent;
         scrollbar-background-active: transparent;
-        scrollbar-color: magenta;
-        scrollbar-color-hover: magenta 80%;
-        scrollbar-color-active: magenta 60%;
+        scrollbar-color: {COLOR_DEFAULT_TRANSPARENT['neutro']};
+        scrollbar-color-hover: {COLOR_DEFAULT_TRANSPARENT['neutro']} 80%;
+        scrollbar-color-active: {COLOR_DEFAULT_TRANSPARENT['neutro']} 60%;
         scrollbar-size: 1 2;
-    }
+    }}
 
-    TextArea > .text-area--cursor-line {
+    TextArea > .text-area--cursor-line {{
         background: transparent;
-    }
+    }}
 
-    DataTable {
+    DataTable {{
         height: 1fr;
-        border: solid #c026d3;
+        border: solid {COLOR_DEFAULT_TRANSPARENT['neutro']};
         background: transparent;
         color: #e0e0e0;
         scrollbar-background: transparent;
         scrollbar-background-hover: transparent;
         scrollbar-background-active: transparent;
-        scrollbar-color: magenta;
-        scrollbar-color-hover: magenta 80%;
-        scrollbar-color-active: magenta 60%;
+        scrollbar-color: {COLOR_DEFAULT_TRANSPARENT['neutro']};
+        scrollbar-color-hover: {COLOR_DEFAULT_TRANSPARENT['neutro']} 80%;
+        scrollbar-color-active: {COLOR_DEFAULT_TRANSPARENT['neutro']} 60%;
         scrollbar-size: 1 2;
         scrollbar-corner-color: transparent;
-    }
+    }}
 
-    DataTable > .datatable--header {
+    DataTable > .datatable--header {{
         background: transparent;
-    }
+    }}
 
-    DataTable > .datatable--cursor {
-        background: #c026d3;
-    }
+    DataTable > .datatable--cursor {{
+        background: {COLOR_DEFAULT_TRANSPARENT['blue']};
+    }}
 
-    Static {
+    Static {{
         background: transparent;
-    }
+    }}
 
-    Footer {
+    LoadingIndicator {{
         background: transparent;
-    }
+    }}
+
+    #status-bar {{
+        dock: bottom;
+        height: 1;
+        width: 1fr;
+        background: transparent;
+    }}
 
     /* ══════════ Dracula Theme ══════════ */
-    Screen.dracula {
+    Screen.dracula {{
         background: #282a36;
         color: #f8f8f2;
-    }
-    Screen.dracula Sidebar {
+    }}
+    Screen.dracula Sidebar {{
         background: #282a36;
         border: solid #bd93f9;
         color: #f8f8f2;
-    }
-    Screen.dracula Sidebar > Static {
+    }}
+    Screen.dracula Sidebar > Static {{
         background: #282a36;
-    }
-    Screen.dracula #title {
+    }}
+    Screen.dracula #title {{
         color: #bd93f9;
         background: #282a36;
-    }
-    Screen.dracula #separator {
+    }}
+    Screen.dracula #separator {{
         color: #bd93f9;
         background: #282a36;
-    }
-    Screen.dracula #db-tree {
+    }}
+    Screen.dracula #db-tree {{
         background: #282a36;
         color: #f8f8f2;
-    }
-    Screen.dracula #main-container {
+    }}
+    Screen.dracula #main-container {{
         background: #282a36;
-    }
-    Screen.dracula Vertical {
+    }}
+    Screen.dracula Vertical {{
         background: #282a36;
-    }
-    Screen.dracula Container {
+    }}
+    Screen.dracula Container {{
         background: #282a36;
-    }
-    Screen.dracula TextArea {
+    }}
+    Screen.dracula TextArea {{
         background: #282a36;
         border: solid #bd93f9;
         color: #f8f8f2;
-    }
-    Screen.dracula DataTable {
+    }}
+    Screen.dracula DataTable {{
         background: #282a36;
         border: solid #bd93f9;
         color: #f8f8f2;
-    }
-    Screen.dracula Static {
+    }}
+    Screen.dracula Static {{
         background: #282a36;
-    }
-    Screen.dracula Footer {
+    }}
+    Screen.dracula #status-bar {{
         background: #282a36;
-        color: #f8f8f2;
-    }
+    }}
 
     /* ══════════ Solid Dark Theme ══════════ */
-    Screen.solid-dark {
+    Screen.solid-dark {{
         background: #0a0a0a;
         color: #ffffff;
-    }
-    Screen.solid-dark Sidebar {
+    }}
+    Screen.solid-dark Sidebar {{
         background: #0a0a0a;
         border: solid #c026d3;
         color: #ffffff;
-    }
-    Screen.solid-dark Sidebar > Static {
+    }}
+    Screen.solid-dark Sidebar > Static {{
         background: #0a0a0a;
-    }
-    Screen.solid-dark #title {
+    }}
+    Screen.solid-dark #title {{
         color: #c026d3;
         background: #0a0a0a;
-    }
-    Screen.solid-dark #separator {
+    }}
+    Screen.solid-dark #separator {{
         color: #c026d3;
         background: #0a0a0a;
-    }
-    Screen.solid-dark #db-tree {
+    }}
+    Screen.solid-dark #db-tree {{
         background: #0a0a0a;
         color: #ffffff;
-    }
-    Screen.solid-dark #main-container {
+    }}
+    Screen.solid-dark #main-container {{
         background: #0a0a0a;
-    }
-    Screen.solid-dark Vertical {
+    }}
+    Screen.solid-dark Vertical {{
         background: #0a0a0a;
-    }
-    Screen.solid-dark Container {
+    }}
+    Screen.solid-dark Container {{
         background: #0a0a0a;
-    }
-    Screen.solid-dark TextArea {
+    }}
+    Screen.solid-dark TextArea {{
         background: #0a0a0a;
         border: solid #c026d3;
         color: #ffffff;
-    }
-    Screen.solid-dark DataTable {
+    }}
+    Screen.solid-dark DataTable {{
         background: #0a0a0a;
         border: solid #c026d3;
         color: #ffffff;
-    }
-    Screen.solid-dark Static {
+    }}
+    Screen.solid-dark Static {{
         background: #0a0a0a;
-    }
-    Screen.solid-dark Footer {
+    }}
+    Screen.solid-dark #status-bar {{
         background: #0a0a0a;
-        color: #ffffff;
-    }
+    }}
 
     /* ══════════ Gruvbox Theme ══════════ */
-    Screen.gruvbox {
+    Screen.gruvbox {{
         background: #282828;
         color: #ebdbb2;
-    }
-    Screen.gruvbox Sidebar {
+    }}
+    Screen.gruvbox Sidebar {{
         background: #282828;
         border: solid #d79921;
         color: #ebdbb2;
-    }
-    Screen.gruvbox Sidebar > Static {
+    }}
+    Screen.gruvbox Sidebar > Static {{
         background: #282828;
-    }
-    Screen.gruvbox #title {
+    }}
+    Screen.gruvbox #title {{
         color: #d79921;
         background: #282828;
-    }
-    Screen.gruvbox #separator {
+    }}
+    Screen.gruvbox #separator {{
         color: #d79921;
         background: #282828;
-    }
-    Screen.gruvbox #db-tree {
+    }}
+    Screen.gruvbox #db-tree {{
         background: #282828;
         color: #ebdbb2;
-    }
-    Screen.gruvbox #main-container {
+    }}
+    Screen.gruvbox #main-container {{
         background: #282828;
-    }
-    Screen.gruvbox Vertical {
+    }}
+    Screen.gruvbox Vertical {{
         background: #282828;
-    }
-    Screen.gruvbox Container {
+    }}
+    Screen.gruvbox Container {{
         background: #282828;
-    }
-    Screen.gruvbox TextArea {
+    }}
+    Screen.gruvbox TextArea {{
         background: #282828;
         border: solid #d79921;
         color: #ebdbb2;
-    }
-    Screen.gruvbox DataTable {
+    }}
+    Screen.gruvbox DataTable {{
         background: #282828;
         border: solid #d79921;
         color: #ebdbb2;
-    }
-    Screen.gruvbox Static {
+    }}
+    Screen.gruvbox Static {{
         background: #282828;
-    }
-    Screen.gruvbox Footer {
+    }}
+    Screen.gruvbox #status-bar {{
         background: #282828;
-        color: #ebdbb2;
-    }
+    }}
     """
 
     def __init__(self):
@@ -343,7 +389,7 @@ class TextualApp(App):
             with Vertical():
                 yield TextArea(placeholder="Digite sua query SQL aqui...", id="input_text")
                 yield DataTable(id="data_table", cursor_type="cell", header_height=3)
-        yield Footer()
+        yield StatusBar()
 
     def on_mount(self) -> None:
         table = self.query_one("#data_table", DataTable)
@@ -362,7 +408,7 @@ class TextualApp(App):
         t.append(col_name, style="bold")
         if col_type:
             t.append("\n")
-            t.append(col_type, style="dim italic")
+            t.append(col_type, style=f"dim italic {COLOR_DEFAULT_TRANSPARENT['yellow']}")
         t.append("\n")
         t.append("─" * 16, style="dim")
         return t
@@ -370,15 +416,18 @@ class TextualApp(App):
     # ── Theme cycling ────────────────────────────────────────
 
     def _apply_theme(self, theme_name: str) -> None:
-        """Apply theme via CSS classes (bypasses Textual Theme system)."""
-        # Remove all theme classes from screen
+        """Apply theme via CSS classes + status bar colors."""
         for cls in ALL_THEME_CLASSES:
             self.screen.remove_class(cls)
 
-        # Add the new theme class (transparent has no class = CSS defaults)
         css_class = THEME_CSS_CLASS.get(theme_name)
         if css_class:
             self.screen.add_class(css_class)
+
+        colors = THEME_COLORS[theme_name]
+        self.query_one("#status-bar", StatusBar).set_colors(
+            colors["accent"], colors["text"]
+        )
 
         self._current_theme = theme_name
 

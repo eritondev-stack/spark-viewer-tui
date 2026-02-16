@@ -8,8 +8,11 @@ from textual.containers import Container, Vertical
 from textual.widgets import TextArea, DataTable, Static, Tree
 
 from config import load_config, save_config
+from queries import load_queries, add_query
 from spark_manager import SparkManager
 from screens.spark_config import SparkConfigScreen
+from screens.save_query import SaveQueryScreen
+from screens.load_query import LoadQueryScreen
 
 # Configure JAVA_HOME for PySpark
 os.environ["JAVA_HOME"] = "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
@@ -36,8 +39,10 @@ ALL_THEME_CLASSES = {"dracula", "solid-dark", "gruvbox"}
 # Bindings shown in the status bar
 APP_BINDINGS = [
     ("F2", "Spark Config"),
+    ("F3", "Save Query"),
+    ("F4", "Load Query"),
     ("^S", "Start Spark"),
-    ("^Enter", "Run SQL"),
+    ("^E", "Run SQL"),
     ("^T", "Theme"),
 ]
 
@@ -96,8 +101,10 @@ class TextualApp(App):
 
     BINDINGS = [
         ("f2", "open_config", "Spark Config"),
+        ("f3", "save_query", "Save Query"),
+        ("f4", "load_query", "Load Query"),
         ("ctrl+s", "start_spark", "Start Spark"),
-        Binding("ctrl+enter", "execute_query", "Run SQL", priority=True),
+        Binding("ctrl+e", "execute_query", "Run SQL", priority=True),
         ("ctrl+t", "cycle_theme", "Change Theme"),
         Binding("ctrl+w", "toggle_maximize", "Maximize", priority=True),
     ]
@@ -523,6 +530,37 @@ class TextualApp(App):
             text_area.display = False
             data_table.styles.border = ("none", "transparent")
             self._maximized_widget = focused
+
+    # ── Query save / load ────────────────────────────────────
+
+    def action_save_query(self) -> None:
+        text_area = self.query_one("#input_text", TextArea)
+        sql = text_area.text.strip()
+        if not sql:
+            self.notify("Write a query first.", severity="warning")
+            return
+        self.push_screen(SaveQueryScreen(sql), self._on_query_saved)
+
+    def _on_query_saved(self, name: str | None) -> None:
+        if name is None:
+            return
+        sql = self.query_one("#input_text", TextArea).text.strip()
+        add_query(name, sql)
+        self.notify(f"Query saved: {name}")
+
+    def action_load_query(self) -> None:
+        queries = load_queries()
+        if not queries:
+            self.notify("No saved queries.", severity="warning")
+            return
+        self.push_screen(LoadQueryScreen(queries), self._on_query_loaded)
+
+    def _on_query_loaded(self, sql: str | None) -> None:
+        if sql is None:
+            return
+        text_area = self.query_one("#input_text", TextArea)
+        text_area.load_text(sql)
+        self.notify("Query loaded.")
 
     # ── Config popup ─────────────────────────────────────────
 

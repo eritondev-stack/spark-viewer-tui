@@ -3,7 +3,6 @@ from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical
-from textual.theme import Theme
 from textual.widgets import TextArea, DataTable, Static, Tree, Footer
 
 from config import load_config, save_config
@@ -13,78 +12,18 @@ from screens.spark_config import SparkConfigScreen
 # Configure JAVA_HOME for PySpark
 os.environ["JAVA_HOME"] = "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
 
+# Theme names for cycling (Ctrl+T)
+THEME_NAMES = ["Transparent", "Dracula", "Solid Dark", "Gruvbox"]
 
-# Theme 1: Dark theme (CSS controla transparência)
-THEME_TRANSPARENT = Theme(
-    name="spark_transparent",
-    primary="#c026d3",  # magenta
-    secondary="#a855f7",
-    accent="#c026d3",
-    foreground="#ffffff",
-    background="#0a0a0a",  # quase preto
-    success="#22c55e",
-    warning="#eab308",
-    error="#ef4444",
-    surface="#0a0a0a",
-    panel="#0a0a0a",
-    dark=True,
-    variables={
-        "footer-background": "#0a0a0a",
-        "footer-key-background": "#c026d3",
-        "footer-key-foreground": "#ffffff",
-        "footer-description-background": "#0a0a0a",
-        "footer-description-foreground": "#ffffff",
-        "footer-item-background": "#0a0a0a",
-    },
-)
+# CSS class to add to Screen for each theme (None = no class = transparent defaults)
+THEME_CSS_CLASS = {
+    "Transparent": None,
+    "Dracula": "dracula",
+    "Solid Dark": "solid-dark",
+    "Gruvbox": "gruvbox",
+}
 
-# Theme 2: Solid dark backgrounds
-THEME_SOLID = Theme(
-    name="spark_solid",
-    primary="#c026d3",  # magenta
-    secondary="#a855f7",
-    accent="#c026d3",
-    foreground="#ffffff",
-    background="#0a0a0a",
-    success="#22c55e",
-    warning="#eab308",
-    error="#ef4444",
-    surface="#171717",
-    panel="#262626",
-    dark=True,
-    variables={
-        "footer-background": "#171717",
-        "footer-key-background": "#c026d3",
-        "footer-key-foreground": "#ffffff",
-        "footer-description-background": "#171717",
-        "footer-description-foreground": "#ffffff",
-        "footer-item-background": "#171717",
-    },
-)
-
-# Theme 3: Gruvbox inspired
-THEME_GRUVBOX = Theme(
-    name="spark_gruvbox",
-    primary="#d79921",  # yellow
-    secondary="#689d6a",  # aqua
-    accent="#fe8019",  # orange
-    foreground="#ebdbb2",
-    background="#282828",
-    success="#b8bb26",
-    warning="#fabd2f",
-    error="#fb4934",
-    surface="#3c3836",
-    panel="#504945",
-    dark=True,
-    variables={
-        "footer-background": "#3c3836",
-        "footer-key-background": "#d79921",
-        "footer-key-foreground": "#282828",
-        "footer-description-background": "#3c3836",
-        "footer-description-foreground": "#ebdbb2",
-        "footer-item-background": "#3c3836",
-    },
-)
+ALL_THEME_CLASSES = {"dracula", "solid-dark", "gruvbox"}
 
 
 class Sidebar(Static):
@@ -109,19 +48,20 @@ class TextualApp(App):
     ]
 
     CSS = """
+    /* ══════════ Base / Transparent Theme ══════════ */
     Screen {
         layout: horizontal;
         background: transparent;
-        color: $text;
+        color: #e0e0e0;
     }
 
     Sidebar {
         width: 30;
         height: 1fr;
-        border: solid $primary;
+        border: solid #c026d3;
         padding: 1;
         background: transparent;
-        color: $text;
+        color: #e0e0e0;
     }
 
     Sidebar > Static {
@@ -130,23 +70,23 @@ class TextualApp(App):
 
     #title {
         text-style: bold;
-        color: $primary;
+        color: #c026d3;
         text-align: center;
         background: transparent;
     }
 
     #separator {
-        color: $primary;
+        color: #c026d3;
         background: transparent;
     }
 
     Label {
-        color: $text;
+        color: #e0e0e0;
     }
 
     #db-tree {
         background: transparent;
-        color: $text;
+        color: #e0e0e0;
         padding: 0;
         scrollbar-background: transparent;
         scrollbar-background-hover: transparent;
@@ -158,11 +98,11 @@ class TextualApp(App):
     }
 
     Tree > .tree--cursor {
-        background: $primary;
+        background: #c026d3;
     }
 
     Tree > .tree--guides {
-        color: $primary;
+        color: #c026d3;
     }
 
     Tree > .tree--guides-hover {
@@ -186,10 +126,10 @@ class TextualApp(App):
 
     TextArea {
         height: 10;
-        border: solid $primary;
+        border: solid #c026d3;
         padding: 0;
         background: transparent;
-        color: $text;
+        color: #e0e0e0;
         scrollbar-background: transparent;
         scrollbar-background-hover: transparent;
         scrollbar-background-active: transparent;
@@ -205,9 +145,9 @@ class TextualApp(App):
 
     DataTable {
         height: 1fr;
-        border: solid $primary;
+        border: solid #c026d3;
         background: transparent;
-        color: $text;
+        color: #e0e0e0;
         scrollbar-background: transparent;
         scrollbar-background-hover: transparent;
         scrollbar-background-active: transparent;
@@ -223,7 +163,7 @@ class TextualApp(App):
     }
 
     DataTable > .datatable--cursor {
-        background: $primary;
+        background: #c026d3;
     }
 
     Static {
@@ -233,14 +173,169 @@ class TextualApp(App):
     Footer {
         background: transparent;
     }
+
+    /* ══════════ Dracula Theme ══════════ */
+    Screen.dracula {
+        background: #282a36;
+        color: #f8f8f2;
+    }
+    Screen.dracula Sidebar {
+        background: #282a36;
+        border: solid #bd93f9;
+        color: #f8f8f2;
+    }
+    Screen.dracula Sidebar > Static {
+        background: #282a36;
+    }
+    Screen.dracula #title {
+        color: #bd93f9;
+        background: #282a36;
+    }
+    Screen.dracula #separator {
+        color: #bd93f9;
+        background: #282a36;
+    }
+    Screen.dracula #db-tree {
+        background: #282a36;
+        color: #f8f8f2;
+    }
+    Screen.dracula #main-container {
+        background: #282a36;
+    }
+    Screen.dracula Vertical {
+        background: #282a36;
+    }
+    Screen.dracula Container {
+        background: #282a36;
+    }
+    Screen.dracula TextArea {
+        background: #282a36;
+        border: solid #bd93f9;
+        color: #f8f8f2;
+    }
+    Screen.dracula DataTable {
+        background: #282a36;
+        border: solid #bd93f9;
+        color: #f8f8f2;
+    }
+    Screen.dracula Static {
+        background: #282a36;
+    }
+    Screen.dracula Footer {
+        background: #282a36;
+        color: #f8f8f2;
+    }
+
+    /* ══════════ Solid Dark Theme ══════════ */
+    Screen.solid-dark {
+        background: #0a0a0a;
+        color: #ffffff;
+    }
+    Screen.solid-dark Sidebar {
+        background: #0a0a0a;
+        border: solid #c026d3;
+        color: #ffffff;
+    }
+    Screen.solid-dark Sidebar > Static {
+        background: #0a0a0a;
+    }
+    Screen.solid-dark #title {
+        color: #c026d3;
+        background: #0a0a0a;
+    }
+    Screen.solid-dark #separator {
+        color: #c026d3;
+        background: #0a0a0a;
+    }
+    Screen.solid-dark #db-tree {
+        background: #0a0a0a;
+        color: #ffffff;
+    }
+    Screen.solid-dark #main-container {
+        background: #0a0a0a;
+    }
+    Screen.solid-dark Vertical {
+        background: #0a0a0a;
+    }
+    Screen.solid-dark Container {
+        background: #0a0a0a;
+    }
+    Screen.solid-dark TextArea {
+        background: #0a0a0a;
+        border: solid #c026d3;
+        color: #ffffff;
+    }
+    Screen.solid-dark DataTable {
+        background: #0a0a0a;
+        border: solid #c026d3;
+        color: #ffffff;
+    }
+    Screen.solid-dark Static {
+        background: #0a0a0a;
+    }
+    Screen.solid-dark Footer {
+        background: #0a0a0a;
+        color: #ffffff;
+    }
+
+    /* ══════════ Gruvbox Theme ══════════ */
+    Screen.gruvbox {
+        background: #282828;
+        color: #ebdbb2;
+    }
+    Screen.gruvbox Sidebar {
+        background: #282828;
+        border: solid #d79921;
+        color: #ebdbb2;
+    }
+    Screen.gruvbox Sidebar > Static {
+        background: #282828;
+    }
+    Screen.gruvbox #title {
+        color: #d79921;
+        background: #282828;
+    }
+    Screen.gruvbox #separator {
+        color: #d79921;
+        background: #282828;
+    }
+    Screen.gruvbox #db-tree {
+        background: #282828;
+        color: #ebdbb2;
+    }
+    Screen.gruvbox #main-container {
+        background: #282828;
+    }
+    Screen.gruvbox Vertical {
+        background: #282828;
+    }
+    Screen.gruvbox Container {
+        background: #282828;
+    }
+    Screen.gruvbox TextArea {
+        background: #282828;
+        border: solid #d79921;
+        color: #ebdbb2;
+    }
+    Screen.gruvbox DataTable {
+        background: #282828;
+        border: solid #d79921;
+        color: #ebdbb2;
+    }
+    Screen.gruvbox Static {
+        background: #282828;
+    }
+    Screen.gruvbox Footer {
+        background: #282828;
+        color: #ebdbb2;
+    }
     """
 
     def __init__(self):
         super().__init__(ansi_color=True)
         self._config = load_config()
         self._spark = SparkManager()
-        self._themes = ["spark_transparent", "spark_solid", "spark_gruvbox"]
-        self._current_theme_idx = 0
+        self._current_theme = "Dracula"
 
     def compose(self) -> ComposeResult:
         yield Sidebar()
@@ -251,16 +346,12 @@ class TextualApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        # Register all custom themes
-        self.register_theme(THEME_TRANSPARENT)
-        self.register_theme(THEME_SOLID)
-        self.register_theme(THEME_GRUVBOX)
-
-        # Activate default theme
-        self.theme = self._themes[self._current_theme_idx]
-
         table = self.query_one("#data_table", DataTable)
         table.add_column(self._make_header("", "No data loaded"), width=30)
+
+        # Apply Dracula as default theme
+        self._apply_theme("Dracula")
+
         if self._config.get("metastore_db") and self._config.get("warehouse_dir"):
             self.notify("Config loaded. Ctrl+S to start Spark.")
         else:
@@ -278,27 +369,37 @@ class TextualApp(App):
 
     # ── Theme cycling ────────────────────────────────────────
 
+    def _apply_theme(self, theme_name: str) -> None:
+        """Apply theme via CSS classes (bypasses Textual Theme system)."""
+        # Remove all theme classes from screen
+        for cls in ALL_THEME_CLASSES:
+            self.screen.remove_class(cls)
+
+        # Add the new theme class (transparent has no class = CSS defaults)
+        css_class = THEME_CSS_CLASS.get(theme_name)
+        if css_class:
+            self.screen.add_class(css_class)
+
+        self._current_theme = theme_name
+
     def action_cycle_theme(self) -> None:
         """Cycle through available themes"""
-        self._current_theme_idx = (self._current_theme_idx + 1) % len(self._themes)
-        new_theme = self._themes[self._current_theme_idx]
-        self.theme = new_theme
-        theme_names = {
-            "spark_transparent": "Transparent",
-            "spark_solid": "Solid Dark",
-            "spark_gruvbox": "Gruvbox",
-        }
-        self.notify(f"Theme: {theme_names.get(new_theme, new_theme)}")
+        try:
+            idx = THEME_NAMES.index(self._current_theme)
+        except ValueError:
+            idx = 0
+        next_idx = (idx + 1) % len(THEME_NAMES)
+        next_name = THEME_NAMES[next_idx]
+        self._apply_theme(next_name)
+        self.notify(f"Theme: {next_name}")
 
     # ── Config popup ─────────────────────────────────────────
 
     def action_open_config(self) -> None:
         """Open Spark configuration modal"""
         try:
-            self.notify("Opening configuration...", severity="information")
             screen = SparkConfigScreen(self._config)
             self.push_screen(screen, self._on_config_saved)
-            self.notify("Screen pushed!", severity="information")
         except Exception as e:
             self.notify(f"Error opening config: {e}", severity="error")
 
@@ -319,7 +420,7 @@ class TextualApp(App):
         metastore = self._config.get("metastore_db", "")
         warehouse = self._config.get("warehouse_dir", "")
         if not metastore or not warehouse:
-            self.notify("Configure Spark paths first (Ctrl+P).", severity="error")
+            self.notify("Configure Spark paths first (F2).", severity="error")
             return
         self.notify("Starting Spark session...")
         self._start_spark_worker(metastore, warehouse)
@@ -338,7 +439,6 @@ class TextualApp(App):
             import traceback
             error_msg = f"Spark error: {str(e)}"
             self.app.call_from_thread(self.notify, error_msg, severity="error")
-            # Log full traceback to console
             print(f"ERROR in Spark worker:\n{traceback.format_exc()}")
 
     def _on_spark_ready(self, catalog_data: dict[str, list[str]]) -> None:

@@ -428,7 +428,7 @@ class TextualApp(App):
         yield Sidebar()
         with Container(id="main-container"):
             with Vertical():
-                yield TextArea(placeholder="Digite sua query SQL aqui...", id="input_text")
+                yield TextArea(language="sql", placeholder="Digite sua query SQL aqui...", id="input_text")
                 yield DataTable(id="data_table", cursor_type="cell", header_height=3)
         yield StatusBar()
 
@@ -678,7 +678,7 @@ class TextualApp(App):
         for row in rows:
             table.add_row(*row)
         table.loading = False
-        self.notify(f"Query returned {len(rows)} rows.")
+        # self.notify(f"Query returned {len(rows)} rows.")
 
     def _on_query_error(self, error: str) -> None:
         table = self.query_one("#data_table", DataTable)

@@ -1,7 +1,9 @@
+from rich.text import Text
 from textual.app import ComposeResult
-from textual.containers import Grid, Horizontal
+from textual.containers import Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import OptionList, Button, Label
+from textual.widgets.option_list import Option
 
 from queries import delete_query
 
@@ -16,6 +18,18 @@ COLOR_DEFAULT_TRANSPARENT = {
 }
 
 
+def _make_option(name: str, sql: str, max_width: int = 60) -> Option:
+    """Build an OptionList item: name bold + query dim on same line."""
+    t = Text()
+    t.append(name, style="bold")
+    t.append("  ")
+    preview = sql.replace("\n", " ").strip()
+    if len(preview) > max_width:
+        preview = preview[:max_width] + "..."
+    t.append(preview, style="dim italic")
+    return Option(t, id=name)
+
+
 class LoadQueryScreen(ModalScreen[str | None]):
     """Modal to select and load a saved query."""
 
@@ -27,7 +41,7 @@ class LoadQueryScreen(ModalScreen[str | None]):
 
     #dialog {{
         padding: 1 2;
-        width: 60;
+        width: 90;
         height: 22;
         border: solid {COLOR_DEFAULT_TRANSPARENT['neutro']};
         background: transparent;
@@ -110,39 +124,49 @@ class LoadQueryScreen(ModalScreen[str | None]):
     }}
     """
 
+    BINDINGS = [("escape", "cancel", "Cancel")]
+
     def __init__(self, queries: dict[str, str]):
         super().__init__()
         self._queries = dict(queries)
+        self._names = list(queries.keys())
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
 
     def compose(self) -> ComposeResult:
         yield Label("Load Query", id="title")
-        option_list = OptionList(*self._queries.keys(), id="query-list")
-        yield option_list
+        options = [_make_option(n, self._queries[n]) for n in self._names]
+        yield OptionList(*options, id="query-list")
         with Horizontal(id="button-row"):
             yield Button("Load", id="btn-load")
             yield Button("Delete", id="btn-delete")
             yield Button("Cancel", id="btn-cancel")
 
+    def _get_selected_name(self) -> str | None:
+        option_list = self.query_one("#query-list", OptionList)
+        idx = option_list.highlighted
+        if idx is None:
+            return None
+        return option_list.get_option_at_index(idx).id
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-load":
-            option_list = self.query_one("#query-list", OptionList)
-            idx = option_list.highlighted
-            if idx is None:
+            name = self._get_selected_name()
+            if name is None:
                 self.notify("Select a query first.", severity="warning")
                 return
-            name = str(option_list.get_option_at_index(idx).prompt)
             self.dismiss(self._queries[name])
         elif event.button.id == "btn-delete":
-            option_list = self.query_one("#query-list", OptionList)
-            idx = option_list.highlighted
-            if idx is None:
+            name = self._get_selected_name()
+            if name is None:
                 self.notify("Select a query first.", severity="warning")
                 return
-            option = option_list.get_option_at_index(idx)
-            name = str(option.prompt)
             del self._queries[name]
+            self._names.remove(name)
             delete_query(name)
-            option_list.remove_option(option.id)
+            option_list = self.query_one("#query-list", OptionList)
+            option_list.remove_option(name)
             self.notify(f"Deleted: {name}")
             if not self._queries:
                 self.dismiss(None)
@@ -150,5 +174,6 @@ class LoadQueryScreen(ModalScreen[str | None]):
             self.dismiss(None)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        name = str(event.option.prompt)
-        self.dismiss(self._queries[name])
+        name = event.option.id
+        if name and name in self._queries:
+            self.dismiss(self._queries[name])

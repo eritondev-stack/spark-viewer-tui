@@ -101,9 +101,14 @@ class SaveQueryScreen(ModalScreen[str | None]):
     }}
     """
 
+    BINDINGS = [("escape", "cancel", "Cancel")]
+
     def __init__(self, current_sql: str):
         super().__init__()
         self._current_sql = current_sql
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
 
     def compose(self) -> ComposeResult:
         yield Grid(

@@ -1,42 +1,50 @@
 from textual.app import ComposeResult
-from textual.containers import Vertical, Horizontal
+from textual.containers import Grid
 from textual.screen import ModalScreen
-from textual.widgets import Input, Button, Static, Label
+from textual.widgets import Input, Button, Label
 
 
 class SparkConfigScreen(ModalScreen[dict | None]):
+    """Modal screen for Spark configuration."""
 
     CSS = """
     SparkConfigScreen {
         align: center middle;
     }
 
-    #config-dialog {
-        width: 70;
-        height: auto;
-        border: solid $primary;
-        background: $surface;
+    #dialog {
+        grid-size: 2;
+        grid-gutter: 1 2;
+        grid-rows: auto auto auto auto auto;
         padding: 1 2;
+        width: 70;
+        height: 21;
+        border: thick $background 80%;
+        background: $surface;
     }
 
-    #config-title {
+    #title {
+        column-span: 2;
+        height: auto;
+        width: 1fr;
+        content-align: center middle;
         text-style: bold;
-        text-align: center;
+    }
+
+    .label {
+        column-span: 2;
+        height: auto;
+        width: 1fr;
+    }
+
+    .input {
+        column-span: 2;
+        height: auto;
+        width: 1fr;
+    }
+
+    Button {
         width: 100%;
-        margin-bottom: 1;
-    }
-
-    .config-label {
-        margin-top: 1;
-    }
-
-    #config-buttons {
-        margin-top: 1;
-        align: center middle;
-    }
-
-    #config-buttons Button {
-        margin: 0 1;
     }
     """
 
@@ -45,23 +53,26 @@ class SparkConfigScreen(ModalScreen[dict | None]):
         self._current_config = current_config
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="config-dialog"):
-            yield Static("Spark Configuration", id="config-title")
-            yield Label("Metastore DB Path:")
-            yield Input(
+        yield Grid(
+            Label("Spark Configuration", id="title"),
+            Label("Metastore DB Path:", classes="label"),
+            Input(
                 value=self._current_config.get("metastore_db", ""),
                 placeholder="/path/to/metastore_db",
                 id="input-metastore",
-            )
-            yield Label("Warehouse Dir Path:")
-            yield Input(
+                classes="input",
+            ),
+            Label("Warehouse Dir Path:", classes="label"),
+            Input(
                 value=self._current_config.get("warehouse_dir", ""),
                 placeholder="/path/to/warehouse",
                 id="input-warehouse",
-            )
-            with Horizontal(id="config-buttons"):
-                yield Button("Save", variant="primary", id="btn-save")
-                yield Button("Cancel", variant="default", id="btn-cancel")
+                classes="input",
+            ),
+            Button("Save", variant="primary", id="btn-save"),
+            Button("Cancel", variant="default", id="btn-cancel"),
+            id="dialog",
+        )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-save":

@@ -1,12 +1,90 @@
+import os
 from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical
+from textual.theme import Theme
 from textual.widgets import TextArea, DataTable, Static, Tree, Footer
 
 from config import load_config, save_config
 from spark_manager import SparkManager
 from screens.spark_config import SparkConfigScreen
+
+# Configure JAVA_HOME for PySpark
+os.environ["JAVA_HOME"] = "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
+
+
+# Theme 1: Dark theme (CSS controla transparência)
+THEME_TRANSPARENT = Theme(
+    name="spark_transparent",
+    primary="#c026d3",  # magenta
+    secondary="#a855f7",
+    accent="#c026d3",
+    foreground="#ffffff",
+    background="#0a0a0a",  # quase preto
+    success="#22c55e",
+    warning="#eab308",
+    error="#ef4444",
+    surface="#0a0a0a",
+    panel="#0a0a0a",
+    dark=True,
+    variables={
+        "footer-background": "#0a0a0a",
+        "footer-key-background": "#c026d3",
+        "footer-key-foreground": "#ffffff",
+        "footer-description-background": "#0a0a0a",
+        "footer-description-foreground": "#ffffff",
+        "footer-item-background": "#0a0a0a",
+    },
+)
+
+# Theme 2: Solid dark backgrounds
+THEME_SOLID = Theme(
+    name="spark_solid",
+    primary="#c026d3",  # magenta
+    secondary="#a855f7",
+    accent="#c026d3",
+    foreground="#ffffff",
+    background="#0a0a0a",
+    success="#22c55e",
+    warning="#eab308",
+    error="#ef4444",
+    surface="#171717",
+    panel="#262626",
+    dark=True,
+    variables={
+        "footer-background": "#171717",
+        "footer-key-background": "#c026d3",
+        "footer-key-foreground": "#ffffff",
+        "footer-description-background": "#171717",
+        "footer-description-foreground": "#ffffff",
+        "footer-item-background": "#171717",
+    },
+)
+
+# Theme 3: Gruvbox inspired
+THEME_GRUVBOX = Theme(
+    name="spark_gruvbox",
+    primary="#d79921",  # yellow
+    secondary="#689d6a",  # aqua
+    accent="#fe8019",  # orange
+    foreground="#ebdbb2",
+    background="#282828",
+    success="#b8bb26",
+    warning="#fabd2f",
+    error="#fb4934",
+    surface="#3c3836",
+    panel="#504945",
+    dark=True,
+    variables={
+        "footer-background": "#3c3836",
+        "footer-key-background": "#d79921",
+        "footer-key-foreground": "#282828",
+        "footer-description-background": "#3c3836",
+        "footer-description-foreground": "#ebdbb2",
+        "footer-item-background": "#3c3836",
+    },
+)
 
 
 class Sidebar(Static):
@@ -24,15 +102,17 @@ class TextualApp(App):
     """Aplicacao principal Textual"""
 
     BINDINGS = [
-        ("ctrl+p", "open_config", "Spark Config"),
+        ("f2", "open_config", "Spark Config"),
         ("ctrl+s", "start_spark", "Start Spark"),
         ("ctrl+e", "execute_query", "Run SQL"),
+        ("ctrl+t", "cycle_theme", "Change Theme"),
     ]
 
     CSS = """
     Screen {
         layout: horizontal;
         background: transparent;
+        color: $text;
     }
 
     Sidebar {
@@ -41,6 +121,7 @@ class TextualApp(App):
         border: solid $primary;
         padding: 1;
         background: transparent;
+        color: $text;
     }
 
     Sidebar > Static {
@@ -59,8 +140,13 @@ class TextualApp(App):
         background: transparent;
     }
 
+    Label {
+        color: $text;
+    }
+
     #db-tree {
         background: transparent;
+        color: $text;
         padding: 0;
         scrollbar-background: transparent;
         scrollbar-background-hover: transparent;
@@ -103,6 +189,7 @@ class TextualApp(App):
         border: solid $primary;
         padding: 0;
         background: transparent;
+        color: $text;
         scrollbar-background: transparent;
         scrollbar-background-hover: transparent;
         scrollbar-background-active: transparent;
@@ -120,6 +207,7 @@ class TextualApp(App):
         height: 1fr;
         border: solid $primary;
         background: transparent;
+        color: $text;
         scrollbar-background: transparent;
         scrollbar-background-hover: transparent;
         scrollbar-background-active: transparent;
@@ -151,6 +239,8 @@ class TextualApp(App):
         super().__init__(ansi_color=True)
         self._config = load_config()
         self._spark = SparkManager()
+        self._themes = ["spark_transparent", "spark_solid", "spark_gruvbox"]
+        self._current_theme_idx = 0
 
     def compose(self) -> ComposeResult:
         yield Sidebar()
@@ -161,12 +251,20 @@ class TextualApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
+        # Register all custom themes
+        self.register_theme(THEME_TRANSPARENT)
+        self.register_theme(THEME_SOLID)
+        self.register_theme(THEME_GRUVBOX)
+
+        # Activate default theme
+        self.theme = self._themes[self._current_theme_idx]
+
         table = self.query_one("#data_table", DataTable)
         table.add_column(self._make_header("", "No data loaded"), width=30)
         if self._config.get("metastore_db") and self._config.get("warehouse_dir"):
             self.notify("Config loaded. Ctrl+S to start Spark.")
         else:
-            self.notify("Ctrl+P to configure Spark paths.")
+            self.notify("F2 to configure Spark paths.")
 
     def _make_header(self, col_type: str, col_name: str) -> Text:
         t = Text()
@@ -178,10 +276,31 @@ class TextualApp(App):
         t.append("─" * 16, style="dim")
         return t
 
+    # ── Theme cycling ────────────────────────────────────────
+
+    def action_cycle_theme(self) -> None:
+        """Cycle through available themes"""
+        self._current_theme_idx = (self._current_theme_idx + 1) % len(self._themes)
+        new_theme = self._themes[self._current_theme_idx]
+        self.theme = new_theme
+        theme_names = {
+            "spark_transparent": "Transparent",
+            "spark_solid": "Solid Dark",
+            "spark_gruvbox": "Gruvbox",
+        }
+        self.notify(f"Theme: {theme_names.get(new_theme, new_theme)}")
+
     # ── Config popup ─────────────────────────────────────────
 
     def action_open_config(self) -> None:
-        self.push_screen(SparkConfigScreen(self._config), self._on_config_saved)
+        """Open Spark configuration modal"""
+        try:
+            self.notify("Opening configuration...", severity="information")
+            screen = SparkConfigScreen(self._config)
+            self.push_screen(screen, self._on_config_saved)
+            self.notify("Screen pushed!", severity="information")
+        except Exception as e:
+            self.notify(f"Error opening config: {e}", severity="error")
 
     def _on_config_saved(self, result: dict | None) -> None:
         if result is not None:
@@ -216,7 +335,11 @@ class TextualApp(App):
                 catalog_data[db] = tables
             self.app.call_from_thread(self._on_spark_ready, catalog_data)
         except Exception as e:
-            self.app.call_from_thread(self.notify, f"Spark error: {e}", severity="error")
+            import traceback
+            error_msg = f"Spark error: {str(e)}"
+            self.app.call_from_thread(self.notify, error_msg, severity="error")
+            # Log full traceback to console
+            print(f"ERROR in Spark worker:\n{traceback.format_exc()}")
 
     def _on_spark_ready(self, catalog_data: dict[str, list[str]]) -> None:
         self.notify("Spark session started!")

@@ -4,6 +4,8 @@ A terminal UI for browsing and querying Delta Lake and Parquet tables with Apach
 
 Built with [Textual](https://textual.textualize.io/) and [PySpark](https://spark.apache.org/docs/latest/api/python/).
 
+GitHub: https://github.com/eritondev-stack/spark-viewer-tui
+
 ## Features
 
 - **Catalog Browser** - Sidebar tree with databases and tables
@@ -68,6 +70,20 @@ uv run python app.py
 4. Click a table in the sidebar or write SQL in the editor
 5. Press `Ctrl+E` to run the query
 
+## Seed (Example Data)
+
+The package includes a seed command that creates 6 Delta tables with 500 rows each (employees, products, orders, customers, logs, metrics). Useful for testing and exploring the tool.
+
+```bash
+# Uses paths from spark_config.json
+spark-viewer-seed
+
+# Or specify paths manually
+spark-viewer-seed --metastore-db ./metastore_db --warehouse-dir ./spark-warehouse
+```
+
+After seeding, run `spark-viewer` and press `Ctrl+S` to load the tables.
+
 ## Scan Paths
 
 Scan paths auto-register Delta and Parquet tables from a directory. Each scan path has a **database name** and a **folder path**.
@@ -103,6 +119,7 @@ Settings are saved in `spark_config.json` in the project directory:
 ```
 spark-viewer-tui/
 ├── app.py              # Main application
+├── seed.py             # Seed example Delta tables
 ├── config.py           # Configuration management
 ├── spark_manager.py    # Spark session and table registration
 ├── queries.py          # Query persistence

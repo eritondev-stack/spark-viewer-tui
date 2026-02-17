@@ -6,8 +6,9 @@ Built with [Textual](https://textual.textualize.io/) and [PySpark](https://spark
 
 GitHub: https://github.com/eritondev-stack/spark-viewer-tui
 
-![video demo](spark-view.png)
+![spark-viewer-tui](spark-view.png)
 
+[video demo]("https://drive.google.com/file/d/16ZDCjVVPLh7t9tRZa_h-kNbk3BJLgfB0/preview")
 
 
 

@@ -95,6 +95,7 @@ class TextualApp(App):
         padding: 1;
         background: transparent;
         color: #e0e0e0;
+        border-title-align: left;
     }
 
     Sidebar > Static {
@@ -145,6 +146,7 @@ class TextualApp(App):
         scrollbar-background-hover: transparent;
         scrollbar-background-active: transparent;
         scrollbar-size: 1 2;
+        border-title-align: left;
     }
 
     TextArea > .text-area--cursor-line {
@@ -160,6 +162,7 @@ class TextualApp(App):
         scrollbar-background-active: transparent;
         scrollbar-size: 1 2;
         scrollbar-corner-color: transparent;
+        border-title-align: left;
     }
 
     DataTable > .datatable--header {
@@ -217,7 +220,11 @@ class TextualApp(App):
         yield StatusBar()
 
     def on_mount(self) -> None:
+        self.query_one("Sidebar").border_title = "Catalog"
+        self.query_one("#input_text", TextArea).border_title = "Run Query"
+
         table = self.query_one("#data_table", DataTable)
+        table.border_title = "Results"
         table.add_column(self._make_header("", "No data loaded"), width=30)
 
         # Apply first theme as default
@@ -468,7 +475,7 @@ class TextualApp(App):
         for row in rows:
             table.add_row(*row)
         table.loading = False
-        # self.notify(f"Query returned {len(rows)} rows.")
+        table.border_title = f"Results (total: {len(rows)})"
 
     def _on_query_error(self, error: str) -> None:
         table = self.query_one("#data_table", DataTable)

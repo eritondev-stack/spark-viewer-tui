@@ -193,6 +193,10 @@ def generate_modal_base_css(themes: dict[str, dict]) -> str:
     #btn-delete {{ color: {col_type_color}; }}
     #btn-delete:hover {{ background: {col_type_color} 20%; }}
     #btn-cancel {{ color: {border}; }}
+    #btn-add-path {{ color: {key_color}; }}
+    #btn-add-path:hover {{ background: {key_color} 20%; }}
+    #btn-remove-path {{ color: {col_type_color}; }}
+    #btn-remove-path:hover {{ background: {col_type_color} 20%; }}
     OptionList {{ background: {bg}; border: solid {border}; color: {text}; scrollbar-color: {scrollbar}; scrollbar-color-hover: {scrollbar} 80%; scrollbar-color-active: {scrollbar} 60%; }}
     OptionList > .option-list--option-highlighted {{ background: {cursor}; }}
     OptionList > .option-list--option-hover {{ background: {bg}; }}
@@ -236,6 +240,10 @@ def generate_modal_theme_css(themes: dict[str, dict]) -> str:
     Screen.{cls} #btn-delete {{ color: {col_type_color}; }}
     Screen.{cls} #btn-delete:hover {{ background: {col_type_color} 20%; }}
     Screen.{cls} #btn-cancel {{ color: {border}; }}
+    Screen.{cls} #btn-add-path {{ color: {key_color}; }}
+    Screen.{cls} #btn-add-path:hover {{ background: {key_color} 20%; }}
+    Screen.{cls} #btn-remove-path {{ color: {col_type_color}; }}
+    Screen.{cls} #btn-remove-path:hover {{ background: {col_type_color} 20%; }}
     Screen.{cls} OptionList {{ background: {bg}; border: solid {border}; color: {text}; scrollbar-color: {scrollbar}; scrollbar-color-hover: {scrollbar} 80%; scrollbar-color-active: {scrollbar} 60%; }}
     Screen.{cls} OptionList > .option-list--option-highlighted {{ background: {cursor}; }}
     Screen.{cls} OptionList > .option-list--option-hover {{ background: {bg}; }}

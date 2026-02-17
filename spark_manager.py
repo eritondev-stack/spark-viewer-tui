@@ -83,6 +83,52 @@ class SparkManager:
     def list_tables(self, database: str) -> list[str]:
         return [t.name for t in self._session.catalog.listTables(database)]
 
+    def scan_and_register_paths(self, scan_paths: list[dict]) -> dict[str, list[str]]:
+        """Scan paths for Delta/Parquet folders and register as Spark tables.
+
+        Each entry: {"path": "/data/...", "db_name": "my_db"}
+        Drops and recreates each database on every call (folders are live).
+        """
+        catalog_data: dict[str, list[str]] = {}
+        for entry in scan_paths:
+            base_path = entry.get("path", "")
+            db_name = entry.get("db_name", "")
+            if not base_path or not db_name:
+                continue
+            if not os.path.isdir(base_path):
+                continue
+            # Drop and recreate — folders are live, always refresh
+            self._session.sql(f"DROP DATABASE IF EXISTS `{db_name}` CASCADE")
+            self._session.sql(f"CREATE DATABASE `{db_name}`")
+            tables: list[str] = []
+            for item in os.listdir(base_path):
+                full_path = os.path.join(base_path, item)
+                if not os.path.isdir(full_path):
+                    continue
+                # Delta: has _delta_log subdirectory
+                if os.path.isdir(os.path.join(full_path, "_delta_log")):
+                    self._session.sql(
+                        f"CREATE TABLE `{db_name}`.`{item}` "
+                        f"USING DELTA LOCATION '{full_path}'"
+                    )
+                    tables.append(item)
+                    continue
+                # Parquet: has .parquet files
+                has_parquet = any(
+                    f.endswith(".parquet")
+                    for f in os.listdir(full_path)
+                    if os.path.isfile(os.path.join(full_path, f))
+                )
+                if has_parquet:
+                    self._session.sql(
+                        f"CREATE TABLE `{db_name}`.`{item}` "
+                        f"USING PARQUET LOCATION '{full_path}'"
+                    )
+                    tables.append(item)
+            if tables:
+                catalog_data[db_name] = sorted(tables)
+        return catalog_data
+
     def execute_sql(self, query: str) -> tuple[list[tuple[str, str]], list[list[str]]]:
         df: DataFrame = self._session.sql(query)
         schema = [(field.name, field.dataType.simpleString()) for field in df.schema.fields]

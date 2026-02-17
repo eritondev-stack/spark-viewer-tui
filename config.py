@@ -6,6 +6,7 @@ CONFIG_FILE = Path(__file__).parent / "spark_config.json"
 DEFAULT_CONFIG = {
     "metastore_db": "",
     "warehouse_dir": "",
+    "scan_paths": [],
 }
 
 

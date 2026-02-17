@@ -381,7 +381,14 @@ class TextualApp(App):
 
     def action_start_spark(self) -> None:
         if self._spark.is_active:
-            self.notify("Spark session already active.", severity="warning")
+            # Spark already running — rescan paths and refresh tree
+            scan_paths = self._config.get("scan_paths", [])
+            if not scan_paths:
+                self.notify("No scan paths configured (F2).", severity="warning")
+                return
+            self.notify("Rescanning paths...")
+            self.query_one("Sidebar").loading = True
+            self._rescan_worker()
             return
         metastore = self._config.get("metastore_db", "")
         warehouse = self._config.get("warehouse_dir", "")
@@ -396,6 +403,10 @@ class TextualApp(App):
     def _start_spark_worker(self, metastore: str, warehouse: str) -> None:
         try:
             self._spark.start_session(metastore, warehouse)
+            # Scan configured paths for Delta/Parquet tables
+            scan_paths = self._config.get("scan_paths", [])
+            if scan_paths:
+                self._spark.scan_and_register_paths(scan_paths)
             databases = self._spark.list_databases()
             catalog_data = {}
             for db in databases:
@@ -407,6 +418,23 @@ class TextualApp(App):
             error_msg = f"Spark error: {str(e)}"
             self.app.call_from_thread(self._on_spark_error, error_msg)
             print(f"ERROR in Spark worker:\n{traceback.format_exc()}")
+
+    @work(thread=True, exclusive=True)
+    def _rescan_worker(self) -> None:
+        try:
+            scan_paths = self._config.get("scan_paths", [])
+            self._spark.scan_and_register_paths(scan_paths)
+            databases = self._spark.list_databases()
+            catalog_data = {}
+            for db in databases:
+                tables = self._spark.list_tables(db)
+                catalog_data[db] = tables
+            self.app.call_from_thread(self._on_spark_ready, catalog_data)
+        except Exception as e:
+            import traceback
+            error_msg = f"Rescan error: {str(e)}"
+            self.app.call_from_thread(self._on_spark_error, error_msg)
+            print(f"ERROR in rescan worker:\n{traceback.format_exc()}")
 
     def _on_spark_error(self, error_msg: str) -> None:
         self.query_one("Sidebar").loading = False

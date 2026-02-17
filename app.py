@@ -13,6 +13,7 @@ from themes import THEME_NAMES, THEME_COLORS, BASE_THEME_CSS, THEME_CSS
 from screens.spark_config import SparkConfigScreen
 from screens.save_query import SaveQueryScreen
 from screens.load_query import LoadQueryScreen
+from screens.theme_selector import ThemeSelectorScreen
 
 # Configure JAVA_HOME for PySpark
 os.environ["JAVA_HOME"] = "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
@@ -276,15 +277,17 @@ class TextualApp(App):
         self._current_theme = theme_name
 
     def action_cycle_theme(self) -> None:
-        """Cycle through available themes"""
-        try:
-            idx = self._theme_names.index(self._current_theme)
-        except ValueError:
-            idx = 0
-        next_idx = (idx + 1) % len(self._theme_names)
-        next_name = self._theme_names[next_idx]
-        self._apply_theme(next_name)
-        # self.notify(f"Theme: {next_name}")
+        """Open theme selector modal."""
+        self.push_screen(
+            ThemeSelectorScreen(self._current_theme),
+            self._on_theme_selected,
+        )
+
+    def _on_theme_selected(self, theme_name: str | None) -> None:
+        if theme_name is None or theme_name == self._current_theme:
+            return
+        self._apply_theme(theme_name)
+        self.notify(f"Theme: {theme_name}")
 
     # ── Maximize toggle ──────────────────────────────────────
 

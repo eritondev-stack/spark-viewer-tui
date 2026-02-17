@@ -511,6 +511,10 @@ class TextualApp(App):
         self.notify(f"Query error: {error}", severity="error")
 
 
-if __name__ == "__main__":
+def main():
     app = TextualApp()
     app.run()
+
+
+if __name__ == "__main__":
+    main()

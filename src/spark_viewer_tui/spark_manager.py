@@ -134,5 +134,5 @@ class SparkManager:
         schema = [(field.name, field.dataType.simpleString()) for field in df.schema.fields]
         rows = []
         for row in df.collect():
-            rows.append([str(val) if val is not None else "" for val in row])
+            rows.append([str(val) if val is not None else None for val in row])
         return schema, rows

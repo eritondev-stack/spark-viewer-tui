@@ -250,7 +250,8 @@ class TextualApp(App):
             t.append("\n")
             t.append(col_type, style=f"dim italic {colors['col_type_color']}")
         t.append("\n")
-        t.append("─" * 16, style="dim")
+        separator_len = max(len(col_name), len(col_type)) if col_type else len(col_name)
+        t.append("─" * separator_len, style="dim")
         return t
 
     # ── Focus tracking ───────────────────────────────────────
@@ -508,9 +509,16 @@ class TextualApp(App):
     def _on_query_results(self, schema: list[tuple[str, str]], rows: list[list[str]]) -> None:
         table = self.query_one("#data_table", DataTable)
         table.clear(columns=True)
-        for col_name, col_type in schema:
-            table.add_column(self._make_header(col_type, col_name), width=16)
-        for row in rows:
+        display_rows = [
+            [v if v is not None else "NULL" for v in row]
+            for row in rows
+        ]
+        for i, (col_name, col_type) in enumerate(schema):
+            header_len = max(len(col_name), len(col_type)) if col_type else len(col_name)
+            data_len = max((len(str(r[i])) for r in display_rows), default=0)
+            col_width = max(header_len, data_len) + 2
+            table.add_column(self._make_header(col_type, col_name), width=col_width)
+        for row in display_rows:
             table.add_row(*row)
         table.loading = False
         table.border_title = f"Results (total: {len(rows)})"

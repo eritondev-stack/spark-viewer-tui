@@ -6,6 +6,14 @@ Built with [Textual](https://textual.textualize.io/) and [PySpark](https://spark
 
 GitHub: https://github.com/eritondev-stack/spark-viewer-tui
 
+![spark-viewer-tui](spark-view.png)
+
+### Demo
+
+<iframe src="https://drive.google.com/file/d/16ZDCjVVPLh7t9tRZa_h-kNbk3BJLgfB0/preview" width="100%" style="aspect-ratio: 16/9;" allow="autoplay"></iframe>
+
+
+
 ## Features
 
 - **Catalog Browser** - Sidebar tree with databases and tables
@@ -19,7 +27,7 @@ GitHub: https://github.com/eritondev-stack/spark-viewer-tui
 
 ## Requirements
 
-- Python 3.12+
+- Python 3.9+
 - Java 17 (for PySpark) — must be available via `JAVA_HOME` or `java` in your `PATH`
 
 ### Java Setup

@@ -20,7 +20,28 @@ GitHub: https://github.com/eritondev-stack/spark-viewer-tui
 ## Requirements
 
 - Python 3.12+
-- Java 17 (for PySpark)
+- Java 17 (for PySpark) — must be available via `JAVA_HOME` or `java` in your `PATH`
+
+### Java Setup
+
+**macOS (Homebrew):**
+```bash
+brew install openjdk@17
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+```
+
+**Linux (Debian/Ubuntu):**
+```bash
+sudo apt install openjdk-17-jdk
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+```
+
+Add the `export JAVA_HOME=...` line to your `~/.bashrc` or `~/.zshrc` to make it persistent.
+
+**Verify:**
+```bash
+java -version
+```
 
 ## Installation
 

@@ -1,4 +1,3 @@
-import os
 from rich.text import Text
 from textual import work, events
 from textual.app import App, ComposeResult
@@ -14,9 +13,6 @@ from screens.spark_config import SparkConfigScreen
 from screens.save_query import SaveQueryScreen
 from screens.load_query import LoadQueryScreen
 from screens.theme_selector import ThemeSelectorScreen
-
-# Configure JAVA_HOME for PySpark
-os.environ["JAVA_HOME"] = "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
 
 # Bindings shown in the status bar
 APP_BINDINGS = [

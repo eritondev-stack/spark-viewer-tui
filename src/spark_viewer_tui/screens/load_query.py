@@ -5,8 +5,8 @@ from textual.screen import ModalScreen
 from textual.widgets import OptionList, Button, Label
 from textual.widgets.option_list import Option
 
-from queries import delete_query
-from themes import MODAL_BASE_CSS, MODAL_THEME_CSS, THEME_NAMES
+from ..queries import delete_query
+from ..themes import MODAL_BASE_CSS, MODAL_THEME_CSS, THEME_NAMES
 
 
 def _make_option(name: str, sql: str, max_width: int = 60) -> Option:

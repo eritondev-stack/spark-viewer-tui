@@ -7,8 +7,8 @@ Usage:
 import argparse
 import sys
 
-from config import load_config
-from spark_manager import SparkManager
+from .config import load_config
+from .spark_manager import SparkManager
 
 
 def create_tables(spark_mgr: SparkManager) -> None:

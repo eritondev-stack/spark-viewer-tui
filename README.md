@@ -12,7 +12,7 @@ GitHub: https://github.com/eritondev-stack/spark-viewer-tui
 - **SQL Editor** - Write and execute Spark SQL queries with syntax highlighting
 - **Results Table** - View query results with column types and row count
 - **Scan Paths** - Auto-register Delta/Parquet folders as Spark tables
-- **Rescan** - Refresh tables on demand (folders are live, Ctrl+S rescans)
+- **Rescan** - Refresh tables on demand (folders are live, Ctrl+R rescans)
 - **Save/Load Queries** - Persist frequently used queries
 - **Themes** - Multiple color themes (Transparent, Dracula, Gruvbox)
 - **Maximize** - Focus on editor or results in full screen
@@ -64,7 +64,7 @@ spark-viewer
 Or run directly from source:
 
 ```bash
-uv run python app.py
+uv run spark-viewer
 ```
 
 ## Keyboard Shortcuts
@@ -74,7 +74,7 @@ uv run python app.py
 | `F2` | Spark Configuration (metastore, warehouse, scan paths) |
 | `F3` | Save current query |
 | `F4` | Load saved query |
-| `Ctrl+S` | Start Spark session / Rescan paths |
+| `Ctrl+R` | Start Spark session / Rescan paths |
 | `Ctrl+E` | Execute SQL query |
 | `Ctrl+T` | Change theme |
 | `Ctrl+W` | Maximize editor or results |
@@ -87,7 +87,7 @@ uv run python app.py
    - **Metastore DB Path** - Where Spark stores metadata (e.g. `/tmp/metastore_db`)
    - **Warehouse Dir Path** - Spark warehouse directory (e.g. `/tmp/spark-warehouse`)
    - **Scan Paths** - Folders to scan for Delta/Parquet tables
-3. Press `Ctrl+S` to start the Spark session
+3. Press `Ctrl+R` to start the Spark session
 4. Click a table in the sidebar or write SQL in the editor
 5. Press `Ctrl+E` to run the query
 
@@ -103,7 +103,7 @@ spark-viewer-seed
 spark-viewer-seed --metastore-db ./metastore_db --warehouse-dir ./spark-warehouse
 ```
 
-After seeding, run `spark-viewer` and press `Ctrl+S` to load the tables.
+After seeding, run `spark-viewer` and press `Ctrl+R` to load the tables.
 
 ## Scan Paths
 
@@ -118,7 +118,7 @@ Subfolders are registered as tables:
 - Subfolder with `_delta_log/` -> Delta table
 - Subfolder with `.parquet` files -> Parquet table
 
-Every `Ctrl+S` drops and recreates the databases from scan paths, keeping tables in sync with the filesystem.
+Every `Ctrl+R` (Refresh Catalog) drops and recreates the databases from scan paths, keeping tables in sync with the filesystem.
 
 ## Configuration
 
@@ -135,21 +135,25 @@ Settings are saved in `spark_config.json` in the project directory:
 }
 ```
 
+Themes are stored in `~/.config/spark-viewer-tui/themes.json`. The file is created automatically on first run with the default themes. Edit it to customize colors or add new themes.
+
 ## Project Structure
 
 ```
 spark-viewer-tui/
-├── app.py              # Main application
-├── seed.py             # Seed example Delta tables
-├── config.py           # Configuration management
-├── spark_manager.py    # Spark session and table registration
-├── queries.py          # Query persistence
-├── themes.py           # Theme system
-├── screens/
-│   ├── spark_config.py    # Spark config modal (F2)
-│   ├── save_query.py      # Save query modal (F3)
-│   ├── load_query.py      # Load query modal (F4)
-│   └── theme_selector.py  # Theme selector modal (Ctrl+T)
+├── src/
+│   └── spark_viewer_tui/
+│       ├── app.py              # Main application
+│       ├── seed.py             # Seed example Delta tables
+│       ├── config.py           # Configuration management
+│       ├── spark_manager.py    # Spark session and table registration
+│       ├── queries.py          # Query persistence
+│       ├── themes.py           # Theme system
+│       └── screens/
+│           ├── spark_config.py    # Spark config modal (F2)
+│           ├── save_query.py      # Save query modal (F3)
+│           ├── load_query.py      # Load query modal (F4)
+│           └── theme_selector.py  # Theme selector modal (Ctrl+T)
 └── pyproject.toml
 ```
 

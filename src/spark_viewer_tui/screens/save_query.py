@@ -3,7 +3,7 @@ from textual.containers import Grid
 from textual.screen import ModalScreen
 from textual.widgets import Input, Button, Label
 
-from themes import MODAL_BASE_CSS, MODAL_THEME_CSS, THEME_NAMES
+from ..themes import MODAL_BASE_CSS, MODAL_THEME_CSS, THEME_NAMES
 
 
 class SaveQueryScreen(ModalScreen[str | None]):

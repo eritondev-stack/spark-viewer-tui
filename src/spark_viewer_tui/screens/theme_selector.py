@@ -5,7 +5,7 @@ from textual.screen import ModalScreen
 from textual.widgets import OptionList, Label
 from textual.widgets.option_list import Option
 
-from themes import MODAL_BASE_CSS, MODAL_THEME_CSS, THEME_NAMES, THEME_COLORS
+from ..themes import MODAL_BASE_CSS, MODAL_THEME_CSS, THEME_NAMES, THEME_COLORS
 
 
 def _make_option(name: str, is_current: bool) -> Option:

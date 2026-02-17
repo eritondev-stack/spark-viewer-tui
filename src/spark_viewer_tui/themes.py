@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
 
-THEMES_FILE = Path(__file__).parent / "themes.json"
+THEMES_DIR = Path.home() / ".config" / "spark-viewer-tui"
+THEMES_FILE = THEMES_DIR / "themes.json"
 
 DEFAULT_THEMES = {
     "Transparent": {
@@ -43,6 +44,7 @@ def load_themes() -> dict[str, dict]:
     if THEMES_FILE.exists():
         with open(THEMES_FILE, "r") as f:
             return json.load(f)
+    THEMES_DIR.mkdir(parents=True, exist_ok=True)
     with open(THEMES_FILE, "w") as f:
         json.dump(DEFAULT_THEMES, f, indent=2)
     return dict(DEFAULT_THEMES)

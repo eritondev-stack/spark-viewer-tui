@@ -5,21 +5,21 @@ from textual.binding import Binding
 from textual.containers import Container, Vertical
 from textual.widgets import TextArea, DataTable, Static, Tree
 
-from config import load_config, save_config
-from queries import load_queries, add_query
-from spark_manager import SparkManager
-from themes import THEME_NAMES, THEME_COLORS, BASE_THEME_CSS, THEME_CSS
-from screens.spark_config import SparkConfigScreen
-from screens.save_query import SaveQueryScreen
-from screens.load_query import LoadQueryScreen
-from screens.theme_selector import ThemeSelectorScreen
+from .config import load_config, save_config
+from .queries import load_queries, add_query
+from .spark_manager import SparkManager
+from .themes import THEME_NAMES, THEME_COLORS, BASE_THEME_CSS, THEME_CSS
+from .screens.spark_config import SparkConfigScreen
+from .screens.save_query import SaveQueryScreen
+from .screens.load_query import LoadQueryScreen
+from .screens.theme_selector import ThemeSelectorScreen
 
 # Bindings shown in the status bar
 APP_BINDINGS = [
     ("F2", "Spark Config"),
     ("F3", "Save Query"),
     ("F4", "Load Query"),
-    ("^S", "Start Spark"),
+    ("^R", "Start Spark"),
     ("^E", "Run SQL"),
     ("^T", "Theme"),
 ]
@@ -31,11 +31,19 @@ class StatusBar(Static):
         super().__init__(id="status-bar")
         self._key_color = "#01f649"
         self._text_color = "#e0e0e0"
+        self._bindings: list[tuple[str, str]] = list(APP_BINDINGS)
         self._extra_bindings: list[tuple[str, str]] = []
+
+    def update_binding_label(self, key: str, new_label: str) -> None:
+        self._bindings = [
+            (k, new_label) if k == key else (k, desc)
+            for k, desc in self._bindings
+        ]
+        self.refresh()
 
     def render(self) -> Text:
         t = Text()
-        for key, desc in APP_BINDINGS:
+        for key, desc in self._bindings:
             t.append(f" {key} ", style=f"bold {self._key_color}")
             t.append(f"{desc} ", style=self._text_color)
         for key, desc in self._extra_bindings:
@@ -71,7 +79,7 @@ class TextualApp(App):
         ("f2", "open_config", "Spark Config"),
         ("f3", "save_query", "Save Query"),
         ("f4", "load_query", "Load Query"),
-        ("ctrl+s", "start_spark", "Start Spark"),
+        ("ctrl+r", "start_spark", "Start Spark"),
         Binding("ctrl+e", "execute_query", "Run SQL", priority=True),
         ("ctrl+t", "cycle_theme", "Change Theme"),
         Binding("ctrl+w", "toggle_maximize", "Maximize", priority=True),
@@ -204,7 +212,11 @@ class TextualApp(App):
         self._spark = SparkManager()
         self._theme_names = THEME_NAMES
         self._theme_colors = THEME_COLORS
-        self._current_theme = self._theme_names[0]
+        saved_theme = self._config.get("theme", "")
+        if saved_theme in self._theme_names:
+            self._current_theme = saved_theme
+        else:
+            self._current_theme = self._theme_names[0]
         self._maximized_widget = None
 
     def compose(self) -> ComposeResult:
@@ -223,11 +235,10 @@ class TextualApp(App):
         table.border_title = "Results"
         table.add_column(self._make_header("", "No data loaded"), width=30)
 
-        # Apply first theme as default
-        self._apply_theme(self._theme_names[0])
+        self._apply_theme(self._current_theme)
 
         if self._config.get("metastore_db") and self._config.get("warehouse_dir"):
-            self.notify("Config loaded. Ctrl+S to start Spark.")
+            self.notify("Config loaded. Ctrl+R to start Spark.")
         else:
             self.notify("F2 to configure Spark paths.")
 
@@ -290,6 +301,8 @@ class TextualApp(App):
         if theme_name is None or theme_name == self._current_theme:
             return
         self._apply_theme(theme_name)
+        self._config["theme"] = theme_name
+        save_config(self._config)
         self.notify(f"Theme: {theme_name}")
 
     # ── Maximize toggle ──────────────────────────────────────
@@ -439,6 +452,7 @@ class TextualApp(App):
     def _on_spark_ready(self, catalog_data: dict[str, list[str]]) -> None:
         self.query_one("Sidebar").loading = False
         self.notify("Spark session started!")
+        self.query_one("#status-bar", StatusBar).update_binding_label("^R", "Refresh Catalog")
         self._populate_tree(catalog_data)
 
     def _populate_tree(self, catalog_data: dict[str, list[str]]) -> None:
@@ -456,7 +470,7 @@ class TextualApp(App):
         if node.is_root or node.children:
             return
         if not self._spark.is_active:
-            self.notify("Start Spark session first (Ctrl+S).", severity="error")
+            self.notify("Start Spark session first (Ctrl+R).", severity="error")
             return
         table_name = str(node.label)
         db_name = str(node.parent.label)
@@ -469,7 +483,7 @@ class TextualApp(App):
 
     def action_execute_query(self) -> None:
         if not self._spark.is_active:
-            self.notify("Start Spark session first (Ctrl+S).", severity="error")
+            self.notify("Start Spark session first (Ctrl+R).", severity="error")
             return
         text_area = self.query_one("#input_text", TextArea)
         query = text_area.text.strip()

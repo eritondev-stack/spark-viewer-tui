@@ -5,7 +5,8 @@ from textual.binding import Binding
 from textual.containers import Container, Vertical
 from textual.widgets import TextArea, DataTable, Static, Tree
 
-from .config import load_config, save_config
+from .config import load_config, save_config, get_auto_spark_paths
+from .ipc_server import IPCServer
 from .queries import load_queries, add_query
 from .spark_manager import SparkManager
 from .themes import THEME_NAMES, THEME_COLORS, BASE_THEME_CSS, THEME_CSS
@@ -218,6 +219,8 @@ class TextualApp(App):
         else:
             self._current_theme = self._theme_names[0]
         self._maximized_widget = None
+        self._ipc_server: IPCServer | None = None
+        self._pending_live_tables: list[dict] = []
 
     def compose(self) -> ComposeResult:
         yield Sidebar()
@@ -237,10 +240,16 @@ class TextualApp(App):
 
         self._apply_theme(self._current_theme)
 
-        if self._config.get("metastore_db") and self._config.get("warehouse_dir"):
-            self.notify("Config loaded. Ctrl+R to start Spark.")
-        else:
-            self.notify("F2 to configure Spark paths.")
+        # Auto-start Spark: usa paths do config ou paths temporários
+        auto = get_auto_spark_paths()
+        metastore = self._config.get("metastore_db") or auto["metastore_db"]
+        warehouse = self._config.get("warehouse_dir") or auto["warehouse_dir"]
+        self.notify("Iniciando Spark...")
+        self.query_one("Sidebar").loading = True
+        self._start_spark_worker(metastore, warehouse)
+
+        # Inicia servidor IPC no event loop do Textual
+        self.call_later(self._start_ipc_server)
 
     def _make_header(self, col_type: str, col_name: str) -> Text:
         colors = self._theme_colors[self._current_theme]
@@ -391,23 +400,17 @@ class TextualApp(App):
 
     def action_start_spark(self) -> None:
         if self._spark.is_active:
-            # Spark already running — rescan paths and refresh tree
+            # Spark já rodando — rescan de paths configurados
             scan_paths = self._config.get("scan_paths", [])
             if not scan_paths:
-                self.notify("No scan paths configured (F2).", severity="warning")
+                self.notify("Nenhum scan path configurado. Use F2 para adicionar.", severity="information")
                 return
-            self.notify("Rescanning paths...")
+            self.notify("Rescaneando paths...")
             self.query_one("Sidebar").loading = True
             self._rescan_worker()
             return
-        metastore = self._config.get("metastore_db", "")
-        warehouse = self._config.get("warehouse_dir", "")
-        if not metastore or not warehouse:
-            self.notify("Configure Spark paths first (F2).", severity="error")
-            return
-        self.notify("Starting Spark session...")
-        self.query_one("Sidebar").loading = True
-        self._start_spark_worker(metastore, warehouse)
+        # Spark ainda iniciando (edge case durante boot do mount)
+        self.notify("Spark ainda iniciando, aguarde...", severity="information")
 
     @work(thread=True, exclusive=True)
     def _start_spark_worker(self, metastore: str, warehouse: str) -> None:
@@ -452,13 +455,26 @@ class TextualApp(App):
 
     def _on_spark_ready(self, catalog_data: dict[str, list[str]]) -> None:
         self.query_one("Sidebar").loading = False
-        self.notify("Spark session started!")
+        self.notify("Spark iniciado!")
         self.query_one("#status-bar", StatusBar).update_binding_label("^R", "Refresh Catalog")
         self._populate_tree(catalog_data)
+        # Drena tabelas live que chegaram antes do Spark estar pronto
+        for payload in self._pending_live_tables:
+            self._register_live_table_worker(
+                payload["table_name"], payload["schema"], payload["rows"]
+            )
+        self._pending_live_tables.clear()
 
     def _populate_tree(self, catalog_data: dict[str, list[str]]) -> None:
         tree = self.query_one("#db-tree", Tree)
         tree.clear()
+        # Banco "live" sempre no topo, se houver tabelas
+        live_tables = self._spark.list_live_tables()
+        if live_tables:
+            live_node = tree.root.add("live", expand=True)
+            for table_name in live_tables:
+                live_node.add_leaf(table_name)
+        # Bancos do catálogo Spark normais
         for db_name, tables in catalog_data.items():
             db_node = tree.root.add(db_name, expand=True)
             for table_name in tables:
@@ -471,11 +487,13 @@ class TextualApp(App):
         if node.is_root or node.children:
             return
         if not self._spark.is_active:
-            self.notify("Start Spark session first (Ctrl+R).", severity="error")
+            self.notify("Spark ainda não está pronto.", severity="error")
             return
         table_name = str(node.label)
         db_name = str(node.parent.label)
-        query = f"SELECT * FROM {db_name}.{table_name} LIMIT 1000"
+        # "live" na sidebar corresponde a global_temp no Spark
+        actual_db = "global_temp" if db_name == "live" else db_name
+        query = f"SELECT * FROM {actual_db}.{table_name} LIMIT 1000"
         text_area = self.query_one("#input_text", TextArea)
         text_area.load_text(query)
         self._run_query(query)
@@ -527,6 +545,89 @@ class TextualApp(App):
         table = self.query_one("#data_table", DataTable)
         table.loading = False
         self.notify(f"Query error: {error}", severity="error")
+
+    # ── IPC server ───────────────────────────────────────────────────────────
+
+    async def _start_ipc_server(self) -> None:
+        """Inicia o servidor IPC no event loop do Textual."""
+        try:
+            self._ipc_server = IPCServer(on_dataframe_received=self._on_ipc_dataframe)
+            await self._ipc_server.start()
+        except OSError as e:
+            self.notify(f"IPC não iniciou (porta 7891 ocupada?): {e}", severity="warning")
+            self._ipc_server = None
+
+    async def _on_ipc_dataframe(self, payload: dict) -> None:
+        """Chamado pelo IPCServer quando um print_df() é recebido."""
+        table_name = payload.get("table_name", "")
+        schema = payload.get("schema", [])
+        rows = payload.get("rows", [])
+
+        if not table_name or not schema:
+            self.notify("Payload inválido recebido pelo IPC.", severity="warning")
+            return
+
+        if not self._spark.is_active:
+            # Spark ainda iniciando — enfileira para processar depois
+            self._pending_live_tables.append(payload)
+            self.notify(f"Spark iniciando... '{table_name}' na fila.", severity="information")
+            return
+
+        self._register_live_table_worker(table_name, schema, rows)
+
+    @work(thread=True, exclusive=False)
+    def _register_live_table_worker(
+        self,
+        table_name: str,
+        schema: list,
+        rows: list,
+    ) -> None:
+        """Registra o DataFrame como global temp view em thread separada."""
+        try:
+            self._spark.register_live_table(table_name, schema, rows)
+            live_tables = self._spark.list_live_tables()
+            self.app.call_from_thread(self._on_live_table_registered, table_name, live_tables)
+        except Exception as e:
+            import traceback
+            self.app.call_from_thread(
+                self.notify, f"Erro ao registrar '{table_name}': {e}", severity="error"
+            )
+            print(f"ERRO ao registrar live table:\n{traceback.format_exc()}")
+
+    def _on_live_table_registered(self, table_name: str, live_tables: list[str]) -> None:
+        """Atualiza a sidebar com a nova tabela live (roda na thread principal)."""
+        tree = self.query_one("#db-tree", Tree)
+
+        # Encontra ou cria o nó "live" no topo da árvore
+        live_node = None
+        for child in tree.root.children:
+            if str(child.label) == "live":
+                live_node = child
+                break
+
+        if live_node is None:
+            # Primeiro live table: reconstrói árvore com "live" no topo
+            existing = [
+                (str(child.label), [str(c.label) for c in child.children])
+                for child in tree.root.children
+            ]
+            tree.clear()
+            live_node = tree.root.add("live", expand=True)
+            for db_label, table_labels in existing:
+                db_node = tree.root.add(db_label, expand=True)
+                for tbl in table_labels:
+                    db_node.add_leaf(tbl)
+
+        # Adiciona folha apenas se ainda não existir (replace não precisa novo nó)
+        existing_labels = {str(child.label) for child in live_node.children}
+        if table_name not in existing_labels:
+            live_node.add_leaf(table_name)
+
+        self.notify(f"live.{table_name} pronto")
+
+    async def on_unmount(self) -> None:
+        if self._ipc_server:
+            await self._ipc_server.stop()
 
 
 def main():

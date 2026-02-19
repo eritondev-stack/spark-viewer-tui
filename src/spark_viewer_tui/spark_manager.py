@@ -4,6 +4,11 @@ import logging
 import os
 import sys
 from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql.types import (
+    StructType, StructField,
+    StringType, IntegerType, LongType, DoubleType, FloatType,
+    BooleanType, TimestampType, DateType, ShortType, ByteType,
+)
 
 
 def _suppress_spark_logs() -> None:
@@ -129,6 +134,41 @@ class SparkManager:
                 catalog_data[db_name] = sorted(tables)
         return catalog_data
 
+    # ── Live tables (global temp views) ──────────────────────────────────────
+
+    def register_live_table(
+        self,
+        table_name: str,
+        schema: list[list[str]],
+        rows: list[list[str | None]],
+    ) -> None:
+        """Registra um DataFrame como global temp view (sem escrita em disco).
+
+        Acessível via ``SELECT * FROM global_temp.<table_name>``.
+        """
+        if not self._session:
+            raise RuntimeError("Spark session não iniciada.")
+
+        spark_schema = StructType([
+            StructField(col_name, _spark_type(col_type), nullable=True)
+            for col_name, col_type in schema
+        ])
+        typed_rows = [
+            [_cast_value(val, col_type) for val, (_, col_type) in zip(row, schema)]
+            for row in rows
+        ]
+        df = self._session.createDataFrame(typed_rows, schema=spark_schema)
+        df.createOrReplaceGlobalTempView(table_name)
+
+    def list_live_tables(self) -> list[str]:
+        """Retorna os nomes das tabelas no banco global_temp (banco 'live')."""
+        if not self._session:
+            return []
+        try:
+            return [t.name for t in self._session.catalog.listTables("global_temp")]
+        except Exception:
+            return []
+
     def execute_sql(self, query: str) -> tuple[list[tuple[str, str]], list[list[str]]]:
         df: DataFrame = self._session.sql(query)
         schema = [(field.name, field.dataType.simpleString()) for field in df.schema.fields]
@@ -136,3 +176,42 @@ class SparkManager:
         for row in df.collect():
             rows.append([str(val) if val is not None else None for val in row])
         return schema, rows
+
+
+# ── Helpers para register_live_table ─────────────────────────────────────────
+
+_TYPE_MAP: dict[str, object] = {
+    "string":    StringType(),
+    "int":       IntegerType(),
+    "bigint":    LongType(),
+    "double":    DoubleType(),
+    "float":     FloatType(),
+    "boolean":   BooleanType(),
+    "timestamp": TimestampType(),
+    "date":      DateType(),
+    "smallint":  ShortType(),
+    "tinyint":   ByteType(),
+}
+
+
+def _spark_type(col_type: str):
+    return _TYPE_MAP.get(col_type.lower(), StringType())
+
+
+def _cast_value(val: str | None, col_type: str) -> object:
+    """Converte string recebida do cliente para o tipo Python correspondente."""
+    if val is None:
+        return None
+    ct = col_type.lower()
+    try:
+        if ct in ("int", "smallint", "tinyint"):
+            return int(val)
+        if ct == "bigint":
+            return int(val)
+        if ct in ("double", "float"):
+            return float(val)
+        if ct == "boolean":
+            return val.lower() in ("true", "1", "yes")
+    except (ValueError, TypeError):
+        return None
+    return val

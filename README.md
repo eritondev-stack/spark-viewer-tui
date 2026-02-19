@@ -17,6 +17,7 @@ GitHub: https://github.com/eritondev-stack/spark-viewer-tui
 - **Catalog Browser** - Sidebar tree with databases and tables
 - **SQL Editor** - Write and execute Spark SQL queries with syntax highlighting
 - **Results Table** - View query results with column types and row count
+- **`print_df`** - Send DataFrames from any script to the TUI in real time (see below)
 - **Scan Paths** - Auto-register Delta/Parquet folders as Spark tables
 - **Rescan** - Refresh tables on demand (folders are live, Ctrl+R rescans)
 - **Save/Load Queries** - Persist frequently used queries
@@ -73,6 +74,8 @@ Or run directly from source:
 uv run spark-viewer
 ```
 
+The Spark session starts automatically on launch. No configuration required to get started — F2 is only needed if you want to connect to an existing metastore or scan paths for Delta/Parquet files.
+
 ## Keyboard Shortcuts
 
 | Key | Action |
@@ -80,7 +83,7 @@ uv run spark-viewer
 | `F2` | Spark Configuration (metastore, warehouse, scan paths) |
 | `F3` | Save current query |
 | `F4` | Load saved query |
-| `Ctrl+R` | Start Spark session / Rescan paths |
+| `Ctrl+R` | Rescan configured paths and refresh catalog |
 | `Ctrl+E` | Execute SQL query |
 | `Ctrl+T` | Change theme |
 | `Ctrl+W` | Maximize editor or results |
@@ -88,14 +91,96 @@ uv run spark-viewer
 
 ## Getting Started
 
-1. Run `spark-viewer`
-2. Press `F2` to configure:
-   - **Metastore DB Path** - Where Spark stores metadata (e.g. `/tmp/metastore_db`)
-   - **Warehouse Dir Path** - Spark warehouse directory (e.g. `/tmp/spark-warehouse`)
-   - **Scan Paths** - Folders to scan for Delta/Parquet tables
-3. Press `Ctrl+R` to start the Spark session
-4. Click a table in the sidebar or write SQL in the editor
-5. Press `Ctrl+E` to run the query
+1. Run `spark-viewer` — Spark starts automatically
+2. Click a table in the sidebar or write SQL in the editor
+3. Press `Ctrl+E` to run the query
+
+To load your own Delta/Parquet files, press `F2` and add scan paths.
+
+---
+
+## `print_df` — Live DataFrame Viewer
+
+Send any Spark or Pandas DataFrame from your script to the running TUI. The DataFrame appears instantly in the sidebar under a database called **`live`** and can be queried with SQL.
+
+### How it works
+
+```
+your_script.py  ──print_df()──►  TCP :7891  ──►  live.<table>  in the TUI
+```
+
+The TUI runs a lightweight TCP server on `localhost:7891`. `print_df` connects, sends the DataFrame as JSON, and the TUI registers it as an in-memory Spark table (`global_temp.<table>`), displayed as `live.<table>` in the sidebar.
+
+### Usage
+
+```python
+from spark_viewer_tui import print_df
+
+# Works with PySpark DataFrames
+print_df(spark_df, "my_table")
+
+# Works with Pandas DataFrames
+print_df(pandas_df, "my_table")
+```
+
+The table appears in the sidebar under `live`. Click it to auto-generate and run `SELECT * FROM global_temp.my_table LIMIT 1000`, or write your own SQL query.
+
+### PySpark example
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import rand, round as spark_round, when, col
+from spark_viewer_tui import print_df
+
+spark = SparkSession.builder.master("local[*]").getOrCreate()
+
+df = spark.range(1, 101).select(
+    col("id"),
+    when(col("id") % 2 == 0, "Par").otherwise("Ímpar").alias("tipo"),
+    spark_round(rand() * 1000, 2).alias("valor"),
+)
+
+print_df(df, "minha_tabela")
+```
+
+### Pandas example
+
+```python
+import pandas as pd
+from spark_viewer_tui import print_df
+
+df = pd.DataFrame({
+    "produto": ["A", "B", "C"],
+    "receita": [1200.50, 850.00, 3400.75],
+    "ativo": [True, False, True],
+})
+
+print_df(df, "produtos")
+```
+
+### Notes
+
+- The TUI must be running before calling `print_df`
+- DataFrames are truncated to **10,000 rows** with a warning if larger
+- Calling `print_df` with the same table name replaces the previous data
+- Tables in `live` are in-memory only — they are lost when the TUI closes
+- Maximum payload size: 256 MB
+
+### Built-in example
+
+Run the included example to see three DataFrames sent to the TUI at once:
+
+```bash
+# Terminal 1
+spark-viewer
+
+# Terminal 2 (after "Spark iniciado!" appears in the TUI)
+spark-viewer-example
+```
+
+This sends three tables to the `live` database: `vendas`, `metricas_servidor`, and `resumo_categorias`.
+
+---
 
 ## Seed (Example Data)
 
@@ -141,6 +226,8 @@ Settings are saved in `spark_config.json` in the project directory:
 }
 ```
 
+All fields are optional. If `metastore_db` and `warehouse_dir` are not set, the TUI uses temporary directories under `/tmp/spark-viewer-tui/` automatically.
+
 Themes are stored in `~/.config/spark-viewer-tui/themes.json`. The file is created automatically on first run with the default themes. Edit it to customize colors or add new themes.
 
 ## Project Structure
@@ -150,6 +237,10 @@ spark-viewer-tui/
 ├── src/
 │   └── spark_viewer_tui/
 │       ├── app.py              # Main application
+│       ├── client.py           # print_df() client API
+│       ├── ipc_server.py       # TCP server for receiving DataFrames
+│       ├── examples/
+│       │   └── spark_example.py  # spark-viewer-example entry point
 │       ├── seed.py             # Seed example Delta tables
 │       ├── config.py           # Configuration management
 │       ├── spark_manager.py    # Spark session and table registration

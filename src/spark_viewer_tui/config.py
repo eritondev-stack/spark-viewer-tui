@@ -1,4 +1,5 @@
 import json
+import tempfile
 from pathlib import Path
 
 CONFIG_FILE = Path(__file__).parent / "spark_config.json"
@@ -21,3 +22,12 @@ def load_config() -> dict:
 def save_config(config: dict) -> None:
     with open(CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=2)
+
+
+def get_auto_spark_paths() -> dict:
+    """Retorna paths de metastore/warehouse em /tmp para auto-start sem F2."""
+    base = Path(tempfile.gettempdir()) / "spark-viewer-tui"
+    return {
+        "metastore_db": str(base / "metastore_db"),
+        "warehouse_dir": str(base / "spark-warehouse"),
+    }
